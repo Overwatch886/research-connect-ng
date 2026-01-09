@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   FileText, 
   Plus, 
@@ -15,7 +16,8 @@ import {
   Trash2,
   TrendingUp,
   Clock,
-  CheckCircle
+  CheckCircle,
+  LogOut
 } from "lucide-react";
 
 // Mock data for demonstration
@@ -48,6 +50,13 @@ const mockSurveys = [
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -95,13 +104,21 @@ const Dashboard = () => {
           </Link>
         </nav>
 
-        {/* Create Survey Button */}
-        <div className="absolute bottom-4 left-4 right-4">
+        {/* Bottom Actions */}
+        <div className="absolute bottom-4 left-4 right-4 space-y-2">
           <Button className="w-full" asChild>
             <Link to="/create-survey">
               <Plus className="w-5 h-5 mr-2" />
               Create Survey
             </Link>
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="w-full text-muted-foreground hover:text-destructive"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-5 h-5 mr-2" />
+            Sign Out
           </Button>
         </div>
       </aside>
