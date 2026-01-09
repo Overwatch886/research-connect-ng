@@ -1,15 +1,20 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileText, Mail, Lock, ArrowRight, Eye, EyeOff, User, GraduationCap, Users } from "lucide-react";
+import { FileText, Mail, Lock, ArrowRight, Eye, EyeOff, User, GraduationCap, Users, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Signup = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const initialRole = searchParams.get("role") || "researcher";
   
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [role, setRole] = useState<"researcher" | "participant">(initialRole as "researcher" | "participant");
   const [formData, setFormData] = useState({
     fullName: "",
@@ -17,10 +22,41 @@ const Signup = () => {
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Will be implemented with Lovable Cloud
-    console.log("Signup attempt:", { ...formData, role });
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            full_name: formData.fullName,
+            role: role,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        toast({
+          title: "Account created!",
+          description: "Welcome to ResearchNaija. Redirecting to dashboard...",
+        });
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error creating account",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -108,6 +144,7 @@ const Signup = () => {
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -124,6 +161,7 @@ const Signup = () => {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <p className="text-xs text-muted-foreground">
@@ -144,6 +182,7 @@ const Signup = () => {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
                   minLength={8}
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -160,9 +199,19 @@ const Signup = () => {
               className="w-full" 
               size="lg"
               variant={role === "participant" ? "gold" : "default"}
+              disabled={isLoading}
             >
-              Create Account
-              <ArrowRight className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  Create Account
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </form>
 
