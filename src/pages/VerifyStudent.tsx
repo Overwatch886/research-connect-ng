@@ -1,8 +1,12 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   FileText, 
   ArrowLeft, 
@@ -12,7 +16,8 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  Search
+  Search,
+  ShieldCheck
 } from "lucide-react";
 
 // Sample Nigerian universities
@@ -38,6 +43,11 @@ const nigerianUniversities = [
 type VerificationMethod = "email" | "studentId";
 
 const VerifyStudent = () => {
+  const { user, isLoading: authLoading } = useAuth();
+  const { profile, isLoading: profileLoading, refetch: refetchProfile } = useProfile();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
   const [method, setMethod] = useState<VerificationMethod>("email");
   const [step, setStep] = useState<"choose" | "verify" | "pending" | "success">("choose");
   const [university, setUniversity] = useState("");
@@ -45,18 +55,160 @@ const VerifyStudent = () => {
   const [email, setEmail] = useState("");
   const [studentId, setStudentId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const filteredUniversities = nigerianUniversities.filter(uni =>
     uni.toLowerCase().includes(universitySearch.toLowerCase())
   );
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    setStep(method === "email" ? "pending" : "success");
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/login");
+    }
+  }, [user, authLoading, navigate]);
+
+  // Check if already verified
+  useEffect(() => {
+    if (profile?.is_verified) {
+      setStep("success");
+    }
+  }, [profile]);
+
+  const validateEmail = (email: string): boolean => {
+    const trimmed = email.trim().toLowerCase();
+    return trimmed.endsWith(".edu.ng") && trimmed.includes("@");
   };
+
+  const validateStudentId = (id: string): boolean => {
+    const trimmed = id.trim();
+    return trimmed.length >= 5 && /^[A-Za-z0-9/-]+$/.test(trimmed);
+  };
+
+  const handleEmailVerification = async () => {
+    if (!user) return;
+
+    if (!validateEmail(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please use a valid Nigerian university email (.edu.ng)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke("send-verification-email", {
+        body: { university, email: email.trim().toLowerCase() },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to send verification email");
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      setStep("pending");
+      toast({
+        title: "Verification Email Sent",
+        description: "Please check your inbox and click the verification link.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Failed to send verification email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStudentIdVerification = async () => {
+    if (!user) return;
+
+    if (!validateStudentId(studentId)) {
+      toast({
+        title: "Invalid Student ID",
+        description: "Please enter a valid matriculation number (at least 5 characters)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.rpc("verify_student_by_id", {
+        p_user_id: user.id,
+        p_university: university.trim(),
+        p_student_id: studentId.trim(),
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Parse the JSON response
+      const result = data as { success: boolean; error?: string } | null;
+      
+      if (!result || !result.success) {
+        throw new Error(result?.error || "Verification failed");
+      }
+
+      await refetchProfile();
+      setStep("success");
+      toast({
+        title: "Verification Complete",
+        description: "Your student status has been verified!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Failed to verify student ID. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!university) {
+      toast({
+        title: "Select University",
+        description: "Please select your university first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (method === "email") {
+      await handleEmailVerification();
+    } else {
+      await handleStudentIdVerification();
+    }
+  };
+
+  const selectUniversity = (uni: string) => {
+    setUniversity(uni);
+    setUniversitySearch(uni);
+    setShowDropdown(false);
+  };
+
+  if (authLoading || profileLoading) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -198,26 +350,42 @@ const VerifyStudent = () => {
                         placeholder="Search universities..."
                         className="pl-10"
                         value={universitySearch}
-                        onChange={(e) => setUniversitySearch(e.target.value)}
+                        onChange={(e) => {
+                          setUniversitySearch(e.target.value);
+                          setShowDropdown(true);
+                          if (!nigerianUniversities.includes(e.target.value)) {
+                            setUniversity("");
+                          }
+                        }}
+                        onFocus={() => setShowDropdown(true)}
                       />
                     </div>
-                    {universitySearch && (
-                      <div className="max-h-48 overflow-y-auto border border-border rounded-lg">
-                        {filteredUniversities.map((uni) => (
-                          <button
-                            key={uni}
-                            onClick={() => {
-                              setUniversity(uni);
-                              setUniversitySearch(uni);
-                            }}
-                            className={`w-full text-left px-4 py-3 hover:bg-muted transition-colors flex items-center gap-3 ${
-                              university === uni ? "bg-primary/5" : ""
-                            }`}
-                          >
-                            <Building2 className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm">{uni}</span>
-                          </button>
-                        ))}
+                    {showDropdown && universitySearch && (
+                      <div className="max-h-48 overflow-y-auto border border-border rounded-lg bg-card">
+                        {filteredUniversities.length > 0 ? (
+                          filteredUniversities.map((uni) => (
+                            <button
+                              key={uni}
+                              onClick={() => selectUniversity(uni)}
+                              className={`w-full text-left px-4 py-3 hover:bg-muted transition-colors flex items-center gap-3 ${
+                                university === uni ? "bg-primary/5" : ""
+                              }`}
+                            >
+                              <Building2 className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm">{uni}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-muted-foreground">
+                            No universities found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {university && (
+                      <div className="flex items-center gap-2 text-sm text-success">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{university}</span>
                       </div>
                     )}
                   </div>
@@ -232,6 +400,9 @@ const VerifyStudent = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Must be a valid .edu.ng email address
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -288,23 +459,51 @@ const VerifyStudent = () => {
                   try again
                 </button>
               </div>
+              <Button variant="outline" asChild>
+                <Link to="/dashboard">Return to Dashboard</Link>
+              </Button>
             </div>
           )}
 
           {step === "success" && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto">
-                <CheckCircle className="w-10 h-10 text-success" />
+                <ShieldCheck className="w-10 h-10 text-success" />
               </div>
               <div>
                 <h1 className="font-display text-2xl font-bold text-foreground mb-2">
                   Verification Complete!
                 </h1>
                 <p className="text-muted-foreground">
-                  Your student status has been verified. You can now participate 
-                  in surveys and earn rewards.
+                  Your student status has been verified
+                  {profile?.university && <> at <strong>{profile.university}</strong></>}. 
+                  You can now participate in surveys and earn rewards.
                 </p>
               </div>
+              {profile && (
+                <div className="bg-card rounded-xl border border-border p-4 text-left">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Name</span>
+                      <span className="font-medium">{profile.full_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">University</span>
+                      <span className="font-medium">{profile.university || "N/A"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Verified Via</span>
+                      <span className="font-medium capitalize">{profile.verification_method || "N/A"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <span className="font-medium text-success flex items-center gap-1">
+                        <CheckCircle className="w-4 h-4" /> Verified
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <Button asChild>
                 <Link to="/dashboard">Go to Dashboard</Link>
               </Button>

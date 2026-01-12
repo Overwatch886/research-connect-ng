@@ -62,12 +62,61 @@ export type Database = {
         }
         Relationships: []
       }
+      student_verifications: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          status: string
+          student_id: string | null
+          token: string | null
+          token_expires_at: string | null
+          university: string
+          user_id: string
+          verification_method: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          status?: string
+          student_id?: string | null
+          token?: string | null
+          token_expires_at?: string | null
+          university: string
+          user_id: string
+          verification_method: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          status?: string
+          student_id?: string | null
+          token?: string | null
+          token_expires_at?: string | null
+          university?: string
+          user_id?: string
+          verification_method?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      verify_student_by_id: {
+        Args: { p_student_id: string; p_university: string; p_user_id: string }
+        Returns: Json
+      }
+      verify_student_by_token: {
+        Args: { verification_token: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

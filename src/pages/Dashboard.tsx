@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { 
   FileText, 
   Plus, 
@@ -17,7 +18,10 @@ import {
   TrendingUp,
   Clock,
   CheckCircle,
-  LogOut
+  LogOut,
+  ShieldAlert,
+  ShieldCheck,
+  Loader2
 } from "lucide-react";
 
 // Mock data for demonstration
@@ -50,13 +54,41 @@ const mockSurveys = [
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const { user, signOut } = useAuth();
+  const { user, signOut, isLoading: authLoading } = useAuth();
+  const { profile, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await signOut();
     navigate("/");
   };
+
+  const getInitials = () => {
+    if (profile?.full_name) {
+      return profile.full_name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    return "U";
+  };
+
+  const getFirstName = () => {
+    if (profile?.full_name) {
+      return profile.full_name.split(" ")[0];
+    }
+    return "User";
+  };
+
+  if (authLoading || profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -147,17 +179,54 @@ const Dashboard = () => {
                 <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
               </button>
               <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
-                AJ
+                {getInitials()}
               </div>
             </div>
           </div>
         </header>
 
         <div className="p-6">
+          {/* Verification Banner */}
+          {profile && !profile.is_verified && (
+            <div className="mb-6 bg-warning/10 border border-warning/30 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
+                  <ShieldAlert className="w-5 h-5 text-warning" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-foreground">Verify Your Student Status</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Complete verification to participate in surveys and earn rewards
+                  </p>
+                </div>
+              </div>
+              <Button asChild>
+                <Link to="/verify-student">Verify Now</Link>
+              </Button>
+            </div>
+          )}
+
+          {profile?.is_verified && (
+            <div className="mb-6 bg-success/10 border border-success/30 rounded-xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground flex items-center gap-2">
+                  Verified Student
+                  <CheckCircle className="w-4 h-4 text-success" />
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {profile.university || "Student status verified"}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-              Welcome back, Adebayo! 👋
+              Welcome back, {getFirstName()}! 👋
             </h1>
             <p className="text-muted-foreground">
               Here's what's happening with your research
