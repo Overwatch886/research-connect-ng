@@ -11,6 +11,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import CreateSurvey from "./pages/CreateSurvey";
 import VerifyStudent from "./pages/VerifyStudent";
+import VerifyEmail from "./pages/VerifyEmail";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +43,12 @@ const App = () => (
                 <VerifyStudent />
               </ProtectedRoute>
             } />
+            <Route path="/verify-student" element={
+              <ProtectedRoute>
+                <VerifyStudent />
+              </ProtectedRoute>
+            } />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/pricing" element={<Pricing />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
