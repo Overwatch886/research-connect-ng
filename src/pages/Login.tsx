@@ -35,9 +35,18 @@ const Login = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
+      // Map errors to safe user messages to prevent information disclosure
+      let userMessage = "Unable to sign in. Please check your credentials and try again.";
+      
+      if (error.message?.toLowerCase().includes('email not confirmed')) {
+        userMessage = "Please verify your email before signing in.";
+      } else if (error.message?.toLowerCase().includes('invalid login credentials')) {
+        userMessage = "Invalid email or password. Please try again.";
+      }
+      
       toast({
-        title: "Error signing in",
-        description: error.message,
+        title: "Sign In Failed",
+        description: userMessage,
         variant: "destructive",
       });
     } finally {

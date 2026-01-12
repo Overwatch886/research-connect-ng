@@ -24,6 +24,37 @@ const Signup = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Client-side validation as defense-in-depth
+    const trimmedName = formData.fullName.trim();
+    
+    if (trimmedName.length === 0) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter your full name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (trimmedName.length > 100) {
+      toast({
+        title: "Name Too Long",
+        description: "Full name must be 100 characters or less.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!['researcher', 'participant'].includes(role)) {
+      toast({
+        title: "Invalid Role",
+        description: "Please select a valid role.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -33,7 +64,7 @@ const Signup = () => {
         options: {
           emailRedirectTo: window.location.origin,
           data: {
-            full_name: formData.fullName,
+            full_name: trimmedName,
             role: role,
           },
         },
@@ -49,9 +80,21 @@ const Signup = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
+      // Map errors to safe user messages to prevent information disclosure
+      let userMessage = "Unable to create account. Please try again.";
+      
+      if (error.message?.toLowerCase().includes('already registered') || 
+          error.message?.toLowerCase().includes('already exists')) {
+        userMessage = "An account with this email may already exist. Try signing in instead.";
+      } else if (error.message?.toLowerCase().includes('password')) {
+        userMessage = "Password does not meet requirements. Please use a stronger password.";
+      } else if (error.message?.toLowerCase().includes('email')) {
+        userMessage = "Please enter a valid email address.";
+      }
+      
       toast({
-        title: "Error creating account",
-        description: error.message,
+        title: "Sign Up Failed",
+        description: userMessage,
         variant: "destructive",
       });
     } finally {
