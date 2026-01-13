@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,29 +89,68 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // For now, we'll simulate sending an email
-    // In production, integrate with Resend or similar service
-    const verificationUrl = `${req.headers.get("origin") || supabaseUrl}/verify-email?token=${verificationToken}`;
+    // Build verification URL
+    const origin = req.headers.get("origin") || "https://bvwygsfylmovlolllhrp.lovableproject.com";
+    const verificationUrl = `${origin}/verify-email?token=${verificationToken}`;
     
-    console.log(`Verification email would be sent to ${email}`);
+    console.log(`Sending verification email to ${email}`);
     console.log(`Verification URL: ${verificationUrl}`);
 
-    // TODO: Integrate with email service (Resend)
-    // For demo purposes, we'll mark it as pending and show the user
+    // Send email via Resend
+    const emailResponse = await resend.emails.send({
+      from: "SurveyNaija <onboarding@resend.dev>",
+      to: [email],
+      subject: "Verify Your Student Email - SurveyNaija",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #16a34a; margin: 0;">SurveyNaija</h1>
+            <p style="color: #666; margin-top: 5px;">Student Verification</p>
+          </div>
+          
+          <div style="background: #f9fafb; border-radius: 12px; padding: 30px; margin-bottom: 20px;">
+            <h2 style="margin-top: 0; color: #111;">Verify Your Student Email</h2>
+            <p>You're almost there! Click the button below to verify your student email and unlock access to paid surveys on SurveyNaija.</p>
+            
+            <p><strong>University:</strong> ${university}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" style="background: #16a34a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">Verify My Email</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666;">This link will expire in 24 hours.</p>
+          </div>
+          
+          <div style="font-size: 12px; color: #999; text-align: center;">
+            <p>If you didn't request this verification, you can safely ignore this email.</p>
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #16a34a;">${verificationUrl}</p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    console.log("Email sent successfully:", emailResponse);
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: "Verification email sent",
-        // In development, include the token for testing
-        ...(Deno.env.get("ENVIRONMENT") !== "production" && { debug_token: verificationToken })
+        message: "Verification email sent! Please check your inbox.",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in send-verification-email:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: error.message || "Failed to send verification email" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
