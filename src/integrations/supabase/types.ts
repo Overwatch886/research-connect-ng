@@ -104,6 +104,92 @@ export type Database = {
         }
         Relationships: []
       }
+      survey_responses: {
+        Row: {
+          completed_at: string | null
+          id: string
+          participant_id: string
+          reward_paid: boolean
+          started_at: string
+          status: string
+          survey_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          participant_id: string
+          reward_paid?: boolean
+          started_at?: string
+          status?: string
+          survey_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          participant_id?: string
+          reward_paid?: boolean
+          started_at?: string
+          status?: string
+          survey_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_responses_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      surveys: {
+        Row: {
+          created_at: string
+          current_responses: number
+          description: string | null
+          estimated_time: number
+          expires_at: string | null
+          id: string
+          max_responses: number | null
+          researcher_id: string
+          reward_amount: number
+          status: string
+          target_universities: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_responses?: number
+          description?: string | null
+          estimated_time?: number
+          expires_at?: string | null
+          id?: string
+          max_responses?: number | null
+          researcher_id: string
+          reward_amount?: number
+          status?: string
+          target_universities?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_responses?: number
+          description?: string | null
+          estimated_time?: number
+          expires_at?: string | null
+          id?: string
+          max_responses?: number | null
+          researcher_id?: string
+          reward_amount?: number
+          status?: string
+          target_universities?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
