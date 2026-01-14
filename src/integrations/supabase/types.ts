@@ -190,9 +190,65 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_rate_limits: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: string
+          window_start: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address: string
+          window_start?: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      student_verifications_safe: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          status: string | null
+          university: string | null
+          user_id: string | null
+          verification_method: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          status?: string | null
+          university?: string | null
+          user_id?: string | null
+          verification_method?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          status?: string | null
+          university?: string | null
+          user_id?: string | null
+          verification_method?: string | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       verify_student_by_id: {
