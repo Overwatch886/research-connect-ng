@@ -24,6 +24,23 @@ const Signup = () => {
     password: "",
   });
 
+  // Password strength scoring (0–4)
+  const getPasswordStrength = (pwd: string): { score: number; label: string; color: string; hint: string } => {
+    if (pwd.length === 0) return { score: 0, label: "", color: "", hint: "" };
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    if (pwd.length < 8) return { score: 0, label: "Too short", color: "bg-rose-500", hint: "Password must be at least 8 characters." };
+    if (score === 1) return { score: 1, label: "Weak", color: "bg-rose-500", hint: "Add uppercase letters, numbers, or symbols." };
+    if (score === 2) return { score: 2, label: "Fair", color: "bg-amber-400", hint: "Add more variety — symbols or mixed case help." };
+    if (score === 3) return { score: 3, label: "Good", color: "bg-yellow-400", hint: "Nearly strong! Add a symbol or more length." };
+    return { score: 4, label: "Strong", color: "bg-emerald-500", hint: "Great password!" };
+  };
+
+  const pwdStrength = getPasswordStrength(formData.password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -56,7 +73,17 @@ const Signup = () => {
       });
       return;
     }
-    
+
+    // Block weak passwords before hitting Supabase
+    if (pwdStrength.score < 2) {
+      toast({
+        title: "Password Too Weak",
+        description: pwdStrength.hint || "Please use a stronger password with uppercase letters, numbers, or symbols.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -318,7 +345,37 @@ const Signup = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+
+              {/* Password Strength Meter */}
+              {formData.password.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4].map((seg) => (
+                      <div
+                        key={seg}
+                        className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                          pwdStrength.score >= seg ? pwdStrength.color : "bg-muted"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs font-medium ${
+                      pwdStrength.score <= 1 ? "text-rose-600" :
+                      pwdStrength.score === 2 ? "text-amber-600" :
+                      pwdStrength.score === 3 ? "text-yellow-600" :
+                      "text-emerald-600"
+                    }`}>
+                      {pwdStrength.label}
+                    </p>
+                    {pwdStrength.score < 4 && (
+                      <p className="text-xs text-muted-foreground">{pwdStrength.hint}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
+
 
             <Button 
               type="submit" 

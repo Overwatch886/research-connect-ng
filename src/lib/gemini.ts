@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "research_connect_gemini_key";
 
@@ -59,6 +60,132 @@ export const extractJson = <T>(text: string): T => {
     throw e;
   }
 };
+
+// ---------------------------------------------------------------------------
+// AI transport
+//
+// Two interchangeable paths, tried in this order:
+//   1. Personal key  -> direct call to Google Generative AI (browser).
+//   2. Platform key  -> `gemini` Supabase Edge Function, which holds the
+//                       server-side GEMINI_API_KEY. Used by every visitor by
+//                       default so the features work without any setup.
+// If the platform key is rate-limited the `gemini_quota_exhausted` event fires
+// and GeminiKeyModal invites the user to supply their own key.
+// ---------------------------------------------------------------------------
+
+export const GEMINI_MODEL_CANDIDATES = [
+  "gemini-2.0-flash",
+  "gemini-2.5-flash",
+  "gemini-flash-latest",
+];
+
+const DEFAULT_GEMINI_MODEL = GEMINI_MODEL_CANDIDATES[0];
+const GEMINI_EDGE_FUNCTION = "gemini";
+
+export type GeminiErrorCode = "quota" | "not_configured" | "unavailable" | "invalid_response";
+
+export class GeminiError extends Error {
+  code: GeminiErrorCode;
+  constructor(code: GeminiErrorCode, message: string) {
+    super(message);
+    this.name = "GeminiError";
+    this.code = code;
+  }
+}
+
+const isQuotaError = (err: any, msg: string): boolean =>
+  err?.status === 429 || /429|resource_exhausted|quota|rate limit|too many requests/i.test(msg);
+
+const isUnknownModelError = (msg: string): boolean =>
+  /not found|not supported|is not found for api version|does not exist|unknown model/i.test(msg);
+
+async function callGeminiDirect(apiKey: string, prompt: string, model: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const candidates = [model, ...GEMINI_MODEL_CANDIDATES.filter((m) => m !== model)];
+  let lastErr: unknown;
+
+  for (const candidate of candidates) {
+    try {
+      const result = await genAI.getGenerativeModel({ model: candidate }).generateContent(prompt);
+      const text = result.response.text().trim();
+      if (text) return text;
+      lastErr = new Error("Gemini returned an empty response.");
+    } catch (err: any) {
+      lastErr = err;
+      const msg = String(err?.message || err);
+      if (isQuotaError(err, msg)) {
+        handleGeminiError(err);
+        throw new GeminiError("quota", "Your Gemini API key has hit its Google AI Studio rate limit.");
+      }
+      if (isUnknownModelError(msg)) continue;
+      throw err;
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error("Gemini generation failed.");
+}
+
+async function callGeminiProxy(prompt: string, model: string): Promise<string> {
+  let data: any = null;
+  let error: any = null;
+
+  try {
+    const res = await supabase.functions.invoke(GEMINI_EDGE_FUNCTION, {
+      body: { prompt, model },
+    });
+    data = res.data;
+    error = res.error;
+  } catch (err: any) {
+    throw new GeminiError("unavailable", err?.message || "Could not reach the platform AI service.");
+  }
+
+  if (error) {
+    let message = error?.message || "The platform AI service is unavailable.";
+    const ctx = error?.context;
+    if (ctx && typeof ctx.json === "function") {
+      try {
+        const parsed = await ctx.json();
+        if (parsed?.message) message = parsed.message;
+        if (parsed?.error === "QUOTA_EXCEEDED") {
+          notifyQuotaExhausted(message);
+          throw new GeminiError("quota", message);
+        }
+        if (parsed?.error === "AI_NOT_CONFIGURED") {
+          throw new GeminiError("not_configured", message);
+        }
+      } catch (parsed) {
+        if (parsed instanceof GeminiError) throw parsed;
+      }
+    }
+    const status = ctx?.status;
+    if (status === 429) {
+      notifyQuotaExhausted(message);
+      throw new GeminiError("quota", message);
+    }
+    if (status === 503) throw new GeminiError("not_configured", message);
+    throw new GeminiError("unavailable", message);
+  }
+
+  if (data?.error) {
+    const message = data?.message || "The platform AI service is unavailable.";
+    if (data.error === "QUOTA_EXCEEDED") {
+      notifyQuotaExhausted(message);
+      throw new GeminiError("quota", message);
+    }
+    if (data.error === "AI_NOT_CONFIGURED") throw new GeminiError("not_configured", message);
+    throw new GeminiError("unavailable", message);
+  }
+
+  const text = String(data?.text || "").trim();
+  if (!text) throw new GeminiError("invalid_response", "The AI returned an empty response.");
+  return text;
+}
+
+async function callGeminiText(prompt: string, model: string = DEFAULT_GEMINI_MODEL): Promise<string> {
+  const apiKey = getGeminiApiKey();
+  if (apiKey) return callGeminiDirect(apiKey, prompt, model);
+  return callGeminiProxy(prompt, model);
+}
 
 // Interface definitions
 export interface ClarificationQuestion {
@@ -134,16 +261,7 @@ export interface ConversationalStepResult {
 export const generateClarificationQuestions = async (
   topic: string
 ): Promise<ClarificationQuestion[]> => {
-  const apiKey = getGeminiApiKey();
-
-  if (!apiKey) {
-    return getFallbackClarifications(topic);
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = getPreferredGeminiModel(genAI);
-
     const prompt = `You are a research methodologist specializing in Nigerian higher education and demographic studies.
 The user wants to conduct a study on the following topic:
 "${topic}"
@@ -160,8 +278,7 @@ Format your output STRICTLY as valid JSON matching this schema:
 ]
 Do not include markdown backticks or any explanatory text. Just the raw JSON.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await callGeminiText(prompt);
     return extractJson<ClarificationQuestion[]>(text);
   } catch (err) {
     console.warn("Gemini API call failed, using fallback", err);
@@ -175,16 +292,7 @@ export const generateSurveyFromClarifications = async (
   topic: string,
   clarifications: Record<string, string>
 ): Promise<GeneratedSurvey> => {
-  const apiKey = getGeminiApiKey();
-
-  if (!apiKey) {
-    return getFallbackSurvey(topic, clarifications);
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = getPreferredGeminiModel(genAI);
-
     const clarificationsSummary = Object.entries(clarifications)
       .map(([k, v]) => `- ${k}: ${v}`)
       .join("\n");
@@ -222,11 +330,10 @@ Output STRICTLY valid raw JSON conforming to this schema:
 }
 Do not include markdown codeblocks or extra text. Only raw JSON.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await callGeminiText(prompt);
     return extractJson<GeneratedSurvey>(text);
   } catch (err) {
-    console.warn("Gemini survey generation failed, using intelligent fallback", err);
+    console.warn("Gemini survey generation failed, using fallback", err);
     handleGeminiError(err);
     return getFallbackSurvey(topic, clarifications);
   }
@@ -240,18 +347,10 @@ export const conductConversationalStep = async (
   userMessage: string,
   currentQuestionIndex: number
 ): Promise<ConversationalStepResult> => {
-  const apiKey = getGeminiApiKey();
   const currentQ = questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex >= questions.length - 1;
 
-  if (!apiKey) {
-    return getFallbackConversationalStep(surveyTitle, questions, userMessage, currentQuestionIndex);
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = getPreferredGeminiModel(genAI);
-
     const formattedHistory = history
       .map((h) => `${h.sender === "user" ? "Student" : "Interviewer"}: ${h.text}`)
       .join("\n");
@@ -313,8 +412,7 @@ STRICT RAW JSON only (no markdown, no extra text):
   "extractedInsight": "1-sentence summary of insight gained"
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await callGeminiText(prompt);
     const parsed = extractJson<{ 
       userIntent?: string;
       evaluationRationale?: string;
@@ -349,24 +447,14 @@ export const generateAcademicPaperDraft = async (
   responsesCount: number = 127,
   groundingSources: GroundingSource[] = []
 ): Promise<string> => {
-  const apiKey = getGeminiApiKey();
+  const questionsSummary = questions.map((q) => `- ${q.title} (Variable: ${q.dataExtracted || q.type})`).join("\n");
 
-  if (!apiKey) {
-    return getFallbackAcademicPaper(surveyTitle, surveyDescription, responsesCount);
-  }
+  const sourcesSection = groundingSources && groundingSources.length > 0
+    ? `\n\nATTACHED RESEARCHER GROUNDING DOCUMENTS & LITERATURE NOTES (Integrate and cite these where applicable):\n` +
+      groundingSources.map((s, idx) => `[Source ${idx + 1}: ${s.name}]\n${s.content.slice(0, 3000)}`).join("\n\n")
+    : "";
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const questionsSummary = questions.map((q) => `- ${q.title} (Variable: ${q.dataExtracted || q.type})`).join("\n");
-
-    const sourcesSection = groundingSources && groundingSources.length > 0
-      ? `\n\nATTACHED RESEARCHER GROUNDING DOCUMENTS & LITERATURE NOTES (Integrate and cite these where applicable):\n` +
-        groundingSources.map((s, idx) => `[Source ${idx + 1}: ${s.name}]\n${s.content.slice(0, 3000)}`).join("\n\n")
-      : "";
-
-    const prompt = `You are a distinguished research professor at the University of Ibadan.
+  const prompt = `You are a distinguished research professor at the University of Ibadan.
 Write an authentic, publication-quality academic research paper draft based on empirical survey data collected via Research Connect NG.
 
 Title: "${surveyTitle}"
@@ -393,11 +481,11 @@ Format the paper with clear academic markdown sections:
 ## References
 (Include 4-5 formal academic citations formatted in APA style relevant to African higher education economics and attached sources).`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+  try {
+    return await callGeminiText(prompt);
   } catch (err) {
     handleGeminiError(err);
-    return getFallbackAcademicPaper(surveyTitle, surveyDescription, responsesCount);
+    throw err;
   }
 };
 
@@ -406,17 +494,7 @@ export const generateAudioOverviewScript = async (
   surveyTitle: string,
   paperContent: string
 ): Promise<string> => {
-  const apiKey = getGeminiApiKey();
-
-  if (!apiKey) {
-    return getFallbackAudioOverviewScript(surveyTitle);
-  }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `You are the executive producer of a Google NotebookLM-style "Deep Dive Audio Overview".
+  const prompt = `You are the executive producer of a Google NotebookLM-style "Deep Dive Audio Overview".
 Two Nigerian academic podcast hosts are discussing the empirical findings of the study: "${surveyTitle}".
 
 Hosts:
@@ -430,11 +508,11 @@ Format the output as a lively, authentic 2-host conversational dialogue transcri
 Dr. Ade: ...
 Chidinma: ...`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+  try {
+    return await callGeminiText(prompt);
   } catch (err) {
     handleGeminiError(err);
-    return getFallbackAudioOverviewScript(surveyTitle);
+    throw err;
   }
 };
 
@@ -477,15 +555,7 @@ export const auditResponseQuality = async (
     };
   }
 
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    return getHeuristicAudit(question, trimmed);
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const prompt = `You are a strict data quality auditor for Research Connect NG, evaluating survey responses from Nigerian university undergraduates.
 
 Question Asked: "${question}"
@@ -504,8 +574,7 @@ Output STRICTLY valid JSON:
   "feedback": "1-sentence assessment explaining why it passed or what is missing"
 }`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const text = await callGeminiText(prompt);
     const cleanJson = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(cleanJson);
     return {
@@ -527,18 +596,8 @@ export const generateSurveyInsights = async (
   questions: any[],
   responses: any[]
 ): Promise<SurveyInsights> => {
-  const apiKey = getGeminiApiKey();
-
-  if (!apiKey || !responses || responses.length === 0) {
-    return getFallbackInsights(surveyTitle, responses?.length || 48);
-  }
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `You are a chief research analyst. Synthesize these survey responses for the study: "${surveyTitle}".
-Total responses collected: ${responses.length}.
+  const prompt = `You are a chief research analyst. Synthesize these survey responses for the study: "${surveyTitle}".
+Total responses collected: ${responses?.length || 0}.
 Questions asked: ${JSON.stringify(questions.map((q) => q.title))}
 
 Provide an executive breakdown strictly conforming to this JSON format:
@@ -561,12 +620,13 @@ Provide an executive breakdown strictly conforming to this JSON format:
 }
 Return raw JSON only.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+  try {
+    const text = await callGeminiText(prompt);
     const cleanJson = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
     return JSON.parse(cleanJson);
   } catch (err) {
-    return getFallbackInsights(surveyTitle, responses.length);
+    handleGeminiError(err);
+    throw err;
   }
 };
 
@@ -1011,108 +1071,20 @@ function getHeuristicAudit(question: string, answer: string): AuditResult {
   };
 }
 
-function getFallbackAudioOverviewScript(title: string): string {
-  return `[THEME MUSIC: Soft, contemporary afrobeats opening chime]
-
-Dr. Ade: Welcome to the Research Connect Academic Briefing. Today, we're doing a deep dive into an empirical dataset that really hits close to home for anyone following Nigerian tertiary education: "${title}". I'm Dr. Ade, and with me is our lead field analyst, Chidinma.
-
-Chidinma: Thanks, Dr. Ade. Looking at these numbers across N = 127 verified students from universities across Nigeria, this isn't just dry statistics. We're seeing acute elasticity in how students are surviving semester shocks.
-
-Dr. Ade: Exactly. Over 74% of respondents reported direct disruption to their daily routines. But what caught my attention in Section 3 was the transit data. Students aren't just adjusting budgets—they're physically walking 2 to 3 kilometers under the afternoon sun just to preserve ₦600 for course handouts.
-
-Chidinma: And notice how peer fintech pooling—Moniepoint, OPay, Kuda—has become the de facto emergency safety net. Hostel mates are literally pooling micro-transfers to buy cooking items in bulk. Without that mutual aid, drop-out rates would be significantly higher.
-
-Dr. Ade: Which leads directly to the policy recommendations in Section 5. University governing councils cannot treat campus shuttle fares as an unregulated private market. Digital fare caps at ₦100 and emergency food vouchers aren't luxuries; they're basic prerequisites for academic persistence.
-
-Chidinma: Absolutely. If you're using this data for your thesis or institutional grant, the complete cross-tabulations and APA citations are in the dossier ready for download.
-
-[THEME MUSIC: Outro fade]`;
+function getFallbackAudioOverviewScript(_title: string): string {
+  throw new Error("GEMINI_API_KEY_REQUIRED");
 }
 
-function getFallbackInsights(title: string, responseCount: number): SurveyInsights {
-  return {
-    summary: `Empirical synthesis of ${responseCount} verified responses shows an escalating cost-of-living strain across Nigerian tertiary institutions. Over 74% of student respondents report cutting personal protein intake or walking long distances across campus due to rising shuttle fares.`,
-    sentimentDistribution: {
-      positive: 22,
-      neutral: 31,
-      critical: 47,
-    },
-    keyTrends: [
-      "Economic trade-offs: 68% of undergraduates prioritize mobile internet data for coursework over campus cafeteria meals.",
-      "Fintech dependency: Over 80% rely on instant micro-transfers (OPay, Kuda, Moniepoint) to pool food funds with roommates.",
-      "Academic fallout: 41% of respondents report missing morning lectures due to off-campus transport bottlenecks.",
-    ],
-    recommendations: [
-      "Institutional subsidized shuttle initiatives: University management should partner with electric bus providers to cap on-campus student transit at ₦100.",
-      "Campus food bank vouchers: Student union governments should establish emergency nutritional aid programs funded by alumni grants.",
-    ],
-  };
+function getFallbackInsights(_title: string, _responseCount: number): SurveyInsights {
+  throw new Error("GEMINI_API_KEY_REQUIRED");
 }
 
 function getFallbackAcademicPaper(
-  title: string,
-  description: string,
-  responsesCount: number
+  _title: string,
+  _description: string,
+  _responsesCount: number
 ): string {
-  return `# Socio-Economic Disparities and Student Resilience in Nigerian Higher Education: An Empirical Study on ${title}
-
-**Lead Researcher:** Research Connect Academic Consortium  
-**Institutional Affiliation:** Inter-University Demographic Research Initiative (Nigeria)  
-**Sample Demographics:** N = ${responsesCount} Verified Nigerian University Undergraduates  
-**Date of Empirical Fieldwork:** ${new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })}  
-
----
-
-## Abstract
-This empirical paper investigates the direct socio-economic and psychological ramifications of **${title}** across Nigerian tertiary institutions. Utilizing verified institutional sampling via Research Connect NG, empirical data was gathered from N = ${responsesCount} students across federal and state universities. Findings indicate acute economic elasticity, with over 74% of participants reporting severe disruptions to daily living routines, nutritional intake, and academic class attendance. The study demonstrates that Nigerian students increasingly rely on digital micro-economies and peer mutual-aid networks to sustain academic persistence amid macro-economic shocks.
-
----
-
-## 1. Introduction & Background
-Tertiary education in emerging African economies operates within a volatile macroeconomic landscape. In Nigeria, the removal of the petrol subsidy and inflationary pressures have created compound vulnerabilities for student populations. This study examines **${title}**, contextualizing how micro-level daily stressors intersect with institutional performance.
-
----
-
-## 2. Methodology & Sampling Framework
-Field data was captured via the Research Connect NG decentralized survey protocol.
-- **Verification Protocol:** Institutional email verification (.edu.ng) and matriculation credential auditing.
-- **Anti-Fraud Mechanism:** Real-time semantic audit utilizing Google Gemini 1.5 Flash to eliminate bot entries and low-effort responses.
-- **Sample Distribution:** Stratified across South-West (42%), South-East/South-South (28%), North-Central (18%), and Northern zones (12%).
-
----
-
-## 3. Empirical Survey Findings
-
-### 3.1 Quantitative Severity Distribution
-| Impact Category | Percentage of Sample (%) | Primary Manifestation |
-| :--- | :--- | :--- |
-| **Severe Disruption** | 47.2% | Skipping meals, missing lectures, academic deferral threats |
-| **Moderate Friction** | 31.5% | Budget reallocations, cutting data budgets, reducing transport |
-| **Manageable Impact** | 21.3% | Compensated by freelancing, tech side-hustles, or family remittances |
-
-### 3.2 Qualitative Phenomenological Case Quotes
-> *"The price of shuttle from gate to faculty doubled in one week. Now, on days I don't have practical labs, I have to walk 2.5 kilometers under the sun just to save ₦600 for printing class handouts."*  
-> — **300L Engineering Student, Federal University**
-
-> *"We now cook in communal batches in the hostel. One person buys garri, another buys oil, and we share. Without peer pooling, surviving semester exams would be impossible."*  
-> — **Final Year Economics Student, State University**
-
----
-
-## 4. Discussion
-The empirical findings substantiate that student persistence in Nigerian universities is primarily buoyed by informal peer solidarity and fintech-driven liquidity networks (OPay, Kuda). However, cognitive fatigue stemming from chronic nutritional and financial anxiety represents an unaddressed impediment to national human capital development.
-
----
-
-## 5. Policy & Stakeholder Recommendations
-1. **Subsidized Campus Transit Corridors:** Tertiary governing councils should establish designated student-rate transport routes with digital fare caps.
-2. **Flexible Micro-Grant Incentives:** Research platforms and corporate CSR arms should expand targeted micro-earnings to subsidize undergraduate living expenses.
-
----
-
-## References
-1. Adebayo, O. A., & Babalola, J. B. (2023). *Macroeconomic Shocks and Student Welfare in Sub-Saharan African Universities*. Journal of African Higher Education, 19(2), 114–132.
-2. Olawuyi, I., & Okonjo, C. (2024). *The Informal Campus Economy: Mutual Aid and Fintech Adoption Among Nigerian Undergraduates*. West African Economic Review, 31(1), 45–63.
-3. World Bank Group. (2023). *Nigeria Development Update: Resettling the Safety Net for Youth*. World Bank Publications.
-`;
+  throw new Error("GEMINI_API_KEY_REQUIRED");
 }
+
+

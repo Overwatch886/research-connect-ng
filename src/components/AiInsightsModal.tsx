@@ -33,15 +33,20 @@ import {
   Plus,
   Trash2,
   ListChecks,
-  CheckCircle2
+  CheckCircle2,
+  Key
 } from "lucide-react";
 import { 
   generateSurveyInsights, 
   generateAcademicPaperDraft, 
   generateAudioOverviewScript, 
+  hasGeminiApiKey,
+  getGeminiApiKey,
+  setGeminiApiKey,
   GroundingSource, 
   SurveyInsights 
 } from "@/lib/gemini";
+import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { useToast } from "@/hooks/use-toast";
 
 interface AiInsightsModalProps {
@@ -120,10 +125,17 @@ export const AiInsightsModal = ({
         responsesToAnalyze
       );
       setInsights(data);
-    } catch (err) {
       toast({
-        title: "Synthesis Error",
-        description: "Failed to generate AI executive insights.",
+        title: "Insights Generated",
+        description: "Gemini 1.5 Flash synthesized fresh cross-campus insights.",
+      });
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      toast({
+        title: "AI Synthesis Error",
+        description: msg.includes("not_configured") || msg.includes("KEY") || msg.includes("quota")
+          ? "Gemini API key is required. Please click 'Configure Gemini AI' at the top to connect your key."
+          : `Failed to generate insights: ${msg}`,
         variant: "destructive",
       });
     } finally {
@@ -150,10 +162,13 @@ export const AiInsightsModal = ({
         title: "Academic Paper Drafted",
         description: `Gemini 1.5 Flash synthesized draft using ${groundingSources.length} grounded source documents.`,
       });
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err?.message || String(err);
       toast({
         title: "Generation Error",
-        description: "Failed to draft academic paper.",
+        description: msg.includes("not_configured") || msg.includes("KEY") || msg.includes("quota")
+          ? "Gemini API key is required. Please click 'Configure Gemini AI' at the top to connect your key."
+          : `Failed to draft academic paper: ${msg}`,
         variant: "destructive",
       });
     } finally {
@@ -170,10 +185,13 @@ export const AiInsightsModal = ({
         title: "Audio Overview Script Generated",
         description: "2-host Deep Dive podcast script ready to listen.",
       });
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err?.message || String(err);
       toast({
         title: "Audio Generation Error",
-        description: "Failed to generate audio overview.",
+        description: msg.includes("not_configured") || msg.includes("KEY") || msg.includes("quota")
+          ? "Gemini API key is required. Please click 'Configure Gemini AI' at the top to connect your key."
+          : `Failed to generate audio overview: ${msg}`,
         variant: "destructive",
       });
     } finally {
@@ -419,9 +437,12 @@ ${insights.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
                 </DialogDescription>
               </div>
             </div>
-            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">
-              <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Grounded Data
-            </Badge>
+            <div className="flex items-center gap-2">
+              <GeminiKeyModal variant="badge" />
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">
+                <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Grounded Data
+              </Badge>
+            </div>
           </div>
         </DialogHeader>
 
@@ -457,9 +478,21 @@ ${insights.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
             ) : insights ? (
               <>
                 {/* Study Header */}
-                <div className="p-3.5 rounded-xl bg-muted/40 border space-y-1">
-                  <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Survey Topic</span>
-                  <h3 className="font-bold text-base text-foreground leading-snug">{surveyTitle}</h3>
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-muted/40 border">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Survey Topic</span>
+                    <h3 className="font-bold text-base text-foreground leading-snug">{surveyTitle}</h3>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateInsights}
+                    disabled={loadingInsights}
+                    className="h-8 text-xs gap-1.5 shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingInsights ? "animate-spin" : ""}`} />
+                    Regenerate
+                  </Button>
                 </div>
 
                 {/* Sentiment Breakdown Bar */}
