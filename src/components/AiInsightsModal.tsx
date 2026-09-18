@@ -571,7 +571,26 @@ ${insights.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
                   </div>
                 </div>
               </>
-            ) : null}
+            ) : (
+              <div className="py-16 text-center space-y-3">
+                <BarChart2 className="w-10 h-10 text-muted-foreground mx-auto" />
+                <h4 className="font-semibold text-sm text-foreground">No Insights Generated Yet</h4>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Click below to synthesize verified student demographic data and extract key behavioral trends using Gemini 1.5 Flash.
+                </p>
+                <div className="flex justify-center gap-2">
+                  <Button
+                    onClick={handleGenerateInsights}
+                    disabled={loadingInsights}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Generate AI Insights
+                  </Button>
+                  <GeminiKeyModal variant="button" />
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* TAB 2: ACADEMIC PAPER & GROUNDING SOURCES */}
@@ -713,6 +732,16 @@ ${insights.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={handleGeneratePaper}
+                      disabled={loadingPaper}
+                      className="h-7 text-xs gap-1 border-purple-200 hover:bg-purple-100 dark:border-purple-800"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${loadingPaper ? "animate-spin" : ""}`} />
+                      Regenerate
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleCopyPaper}
                       className="h-7 text-xs gap-1 border-purple-200 hover:bg-purple-100 dark:border-purple-800"
                     >
@@ -742,13 +771,17 @@ ${insights.recommendations.map((r, i) => `${i + 1}. ${r}`).join("\n")}
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                   Click below to generate an empirical research paper draft grounded in student survey data and your attached literature notes.
                 </p>
-                <Button
-                  onClick={handleGeneratePaper}
-                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Generate Grounded Paper Draft
-                </Button>
+                <div className="flex justify-center gap-2">
+                  <Button
+                    onClick={handleGeneratePaper}
+                    disabled={loadingPaper}
+                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Generate Grounded Paper Draft
+                  </Button>
+                  <GeminiKeyModal variant="button" />
+                </div>
               </div>
             )}
           </TabsContent>

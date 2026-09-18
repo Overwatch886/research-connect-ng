@@ -20,6 +20,7 @@ import {
   ChatMessage, 
   GeneratedQuestion 
 } from "@/lib/gemini";
+import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -326,6 +327,7 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
         </div>
 
         <div className="flex items-center gap-2">
+          <GeminiKeyModal variant="badge" />
           <span className="hidden sm:inline-flex items-center gap-1 font-semibold text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
             <Coins className="w-3 h-3" /> +₦{rewardAmount.toLocaleString()}
           </span>
