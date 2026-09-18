@@ -199,6 +199,27 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
         localStorage.setItem("research_connect_recorded_responses", JSON.stringify(filtered));
         localStorage.removeItem(`survey_draft_${surveyId}`);
 
+        // 4. Update survey response count and auto-close if reached target
+        try {
+          const storedCustom = localStorage.getItem("research_connect_custom_surveys");
+          if (storedCustom) {
+            const customList = JSON.parse(storedCustom);
+            const updatedCustom = customList.map((s: any) => {
+              if (s.id === surveyId) {
+                const newCount = (s.current_responses || 0) + 1;
+                const isFull = s.max_responses && newCount >= s.max_responses;
+                return {
+                  ...s,
+                  current_responses: newCount,
+                  status: isFull ? "completed" : s.status,
+                };
+              }
+              return s;
+            });
+            localStorage.setItem("research_connect_custom_surveys", JSON.stringify(updatedCustom));
+          }
+        } catch (e) {}
+
         // 4. Sync with Supabase if logged in
         if (user?.id) {
           try {

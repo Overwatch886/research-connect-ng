@@ -279,6 +279,27 @@ export const TakeSurvey = () => {
       localStorage.setItem("research_connect_recorded_responses", JSON.stringify(filtered));
       localStorage.removeItem(`survey_draft_${survey.id}`);
 
+      // 4. Update survey response count and auto-close if reached target
+      try {
+        const storedCustom = localStorage.getItem("research_connect_custom_surveys");
+        if (storedCustom) {
+          const customList = JSON.parse(storedCustom);
+          const updatedCustom = customList.map((s: any) => {
+            if (s.id === survey.id) {
+              const newCount = (s.current_responses || 0) + 1;
+              const isFull = s.max_responses && newCount >= s.max_responses;
+              return {
+                ...s,
+                current_responses: newCount,
+                status: isFull ? "completed" : s.status,
+              };
+            }
+            return s;
+          });
+          localStorage.setItem("research_connect_custom_surveys", JSON.stringify(updatedCustom));
+        }
+      } catch (e) {}
+
       // 4. Sync with Supabase if user is logged in
       if (user?.id) {
         try {
@@ -391,6 +412,75 @@ export const TakeSurvey = () => {
             </Button>
             <Button variant="outline" asChild>
               <Link to="/surveys">Browse More Paid Surveys</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user already took this survey
+  const userResponses = typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]")
+    : [];
+  const alreadyCompleted = userResponses.some((r: any) => (r.survey_id || r.id) === survey.id);
+
+  if (alreadyCompleted && !isSubmitted) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-card rounded-2xl border border-border p-8 text-center space-y-6 shadow-xl">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto ring-8 ring-emerald-50 dark:ring-emerald-900/30">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold font-display text-foreground">Survey Already Completed</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              You have already completed this research study and your reward has been credited to your student wallet.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
+              <Link to="/surveys">Browse More Paid Surveys</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link to="/surveys">View Participant Dashboard</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if survey was closed or maximum quota reached
+  const globalStatuses = typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("research_connect_survey_statuses") || "{}")
+    : {};
+  const isClosed = 
+    globalStatuses[survey.id] === "closed" || 
+    (survey as any).status === "closed" || 
+    (survey as any).status === "completed" ||
+    Boolean((survey as any).max_responses && (survey as any).current_responses >= (survey as any).max_responses);
+
+  if (isClosed && !isSubmitted) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-card rounded-2xl border border-border p-8 text-center space-y-6 shadow-xl">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto ring-8 ring-amber-50 dark:ring-amber-900/30">
+            <Clock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold font-display text-foreground">Survey Collection Closed</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This research demographic study has reached its required response quota or was concluded by the research team.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
+              <Link to="/surveys">Browse Active Paid Surveys</Link>
             </Button>
           </div>
         </div>

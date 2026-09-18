@@ -79,7 +79,26 @@ const ParticipantDashboard = () => {
     };
   }, [responses, profile?.balance, localBalanceOverride]);
 
-  // Filter and sort surveys
+  // Differentiate between completed and in-progress survey IDs
+  const completedSurveyIds = useMemo(() => {
+    if (!responses) return new Set<string>();
+    return new Set(
+      responses
+        .filter(r => r.status === "completed")
+        .map(r => r.survey_id || r.surveys?.id)
+    );
+  }, [responses]);
+
+  const inProgressSurveyIds = useMemo(() => {
+    if (!responses) return new Set<string>();
+    return new Set(
+      responses
+        .filter(r => r.status === "in_progress")
+        .map(r => r.survey_id || r.surveys?.id)
+    );
+  }, [responses]);
+
+  // Filter and sort available surveys
   const filteredSurveys = useMemo(() => {
     const localSurveys = JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]");
     const seedDefaults: any[] = [
@@ -121,6 +140,29 @@ const ParticipantDashboard = () => {
     let result = combined.filter((s: any) => {
       if (seen.has(s.id)) return false;
       seen.add(s.id);
+      return true;
+    });
+
+    // 1. Exclude surveys already taken/completed by this user
+    // 2. Exclude surveys closed by researchers or quota reached
+    let globalStatuses: Record<string, string> = {};
+    try {
+      globalStatuses = JSON.parse(localStorage.getItem("research_connect_survey_statuses") || "{}");
+    } catch {}
+
+    result = result.filter(s => {
+      // Exclude if already completed by this user
+      if (completedSurveyIds.has(s.id)) return false;
+
+      // Exclude if manually closed by researcher
+      if (globalStatuses[s.id] === "closed") return false;
+
+      // Exclude if status is closed or completed
+      if (s.status === "closed" || s.status === "completed") return false;
+
+      // Exclude if maximum response quota is reached
+      if (s.max_responses !== null && s.current_responses >= s.max_responses) return false;
+
       return true;
     });
     
@@ -166,26 +208,7 @@ const ParticipantDashboard = () => {
     }
     
     return result;
-  }, [surveys, searchQuery, sortBy, filterBy]);
-
-  // Differentiate between completed and in-progress survey IDs
-  const completedSurveyIds = useMemo(() => {
-    if (!responses) return new Set<string>();
-    return new Set(
-      responses
-        .filter(r => r.status === "completed")
-        .map(r => r.survey_id || r.surveys?.id)
-    );
-  }, [responses]);
-
-  const inProgressSurveyIds = useMemo(() => {
-    if (!responses) return new Set<string>();
-    return new Set(
-      responses
-        .filter(r => r.status === "in_progress")
-        .map(r => r.survey_id || r.surveys?.id)
-    );
-  }, [responses]);
+  }, [surveys, searchQuery, sortBy, filterBy, completedSurveyIds]);
 
   const handleStartSurvey = async (surveyId: string) => {
     setStartingSurveyId(surveyId);

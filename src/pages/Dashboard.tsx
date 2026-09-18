@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   FileText, 
   Plus, 
@@ -25,7 +27,9 @@ import {
   Loader2,
   Sparkles,
   Microscope,
-  GraduationCap
+  GraduationCap,
+  PauseCircle,
+  PlayCircle
 } from "lucide-react";
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { AiInsightsModal } from "@/components/AiInsightsModal";
@@ -63,20 +67,74 @@ const Dashboard = () => {
   const [selectedSurveyForInsights, setSelectedSurveyForInsights] = useState<{ title: string; responses: number } | null>(null);
   const { user, signOut, isLoading: authLoading } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
-  const customSurveys = typeof window !== "undefined" 
-    ? JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]").map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        responses: s.current_responses || 38,
-        target: s.max_responses || 50,
-        status: s.status || "active",
-        createdAt: s.created_at ? s.created_at.split("T")[0] : "Today"
-      }))
-    : [];
+  const [surveyStatuses, setSurveyStatuses] = useState<Record<string, "active" | "closed">>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("research_connect_survey_statuses") || "{}");
+    } catch {
+      return {};
+    }
+  });
 
-  const displaySurveys = [...customSurveys, ...mockSurveys];
+  const displaySurveys = useMemo(() => {
+    const customSurveys = typeof window !== "undefined" 
+      ? JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]").map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          responses: s.current_responses || 0,
+          target: s.max_responses || 50,
+          status: s.status || "active",
+          createdAt: s.created_at ? s.created_at.split("T")[0] : "Today"
+        }))
+      : [];
+
+    const combined = [...customSurveys, ...mockSurveys];
+
+    return combined.map((s) => {
+      // 1. Check researcher manual override
+      const manualStatus = surveyStatuses[s.id];
+      if (manualStatus) {
+        return { ...s, status: manualStatus };
+      }
+      // 2. Automatically close if maximum response quota is reached
+      if (s.responses >= s.target) {
+        return { ...s, status: "completed" };
+      }
+      return s;
+    });
+  }, [surveyStatuses]);
+
+  const handleToggleSurveyStatus = (surveyId: string, currentStatus: string, surveyTitle: string) => {
+    const newStatus = currentStatus === "active" ? "closed" : "active";
+
+    const updatedStatuses: Record<string, "active" | "closed"> = { ...surveyStatuses, [surveyId]: newStatus };
+    setSurveyStatuses(updatedStatuses);
+    localStorage.setItem("research_connect_survey_statuses", JSON.stringify(updatedStatuses));
+
+    try {
+      const stored = localStorage.getItem("research_connect_custom_surveys");
+      if (stored) {
+        const custom = JSON.parse(stored);
+        const updatedCustom = custom.map((s: any) => 
+          s.id === surveyId ? { ...s, status: newStatus } : s
+        );
+        localStorage.setItem("research_connect_custom_surveys", JSON.stringify(updatedCustom));
+      }
+    } catch (e) {}
+
+    try {
+      supabase.from("surveys").update({ status: newStatus }).eq("id", surveyId).then(() => {});
+    } catch (e) {}
+
+    toast({
+      title: newStatus === "closed" ? "Survey Closed" : "Survey Reopened",
+      description: newStatus === "closed" 
+        ? `"${surveyTitle}" has been closed. Students can no longer submit responses.`
+        : `"${surveyTitle}" is now active and accepting student responses.`,
+    });
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -333,33 +391,37 @@ const Dashboard = () => {
 
             <div className="divide-y divide-border">
               {displaySurveys.map((survey) => (
-                <div key={survey.id} className="p-6 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                <div key={survey.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-muted/50 transition-colors">
                   <div className="flex-1">
                     <h3 className="font-medium text-foreground mb-1">{survey.title}</h3>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       <span>{survey.responses} / {survey.target} responses</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         survey.status === 'active' 
-                          ? 'bg-success/10 text-success' 
-                          : 'bg-muted text-muted-foreground'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300' 
+                          : survey.status === 'completed'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-300'
                       }`}>
-                        {survey.status === 'active' ? 'Active' : 'Completed'}
+                        {survey.status === 'active' ? '● Active' : survey.status === 'completed' ? '✓ Quota Reached (Closed)' : '⏸ Closed by Researcher'}
                       </span>
                     </div>
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="w-32 mr-6 hidden sm:block">
+                  <div className="w-32 mr-2 hidden md:block">
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-primary rounded-full transition-all"
+                        className={`h-full rounded-full transition-all ${
+                          survey.status === 'active' ? 'bg-primary' : 'bg-muted-foreground/60'
+                        }`}
                         style={{ width: `${Math.min((survey.responses / survey.target) * 100, 100)}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <Button
                       size="sm"
                       onClick={() => setSelectedSurveyForInsights({ title: survey.title, responses: survey.responses })}
@@ -368,6 +430,29 @@ const Dashboard = () => {
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>AI Insights</span>
                     </Button>
+
+                    {survey.status === "active" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title)}
+                        className="text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/50 gap-1 font-medium"
+                      >
+                        <PauseCircle className="w-3.5 h-3.5" />
+                        <span>Close</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title)}
+                        className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 gap-1 font-medium"
+                      >
+                        <PlayCircle className="w-3.5 h-3.5" />
+                        <span>Reopen</span>
+                      </Button>
+                    )}
+
                     <Button variant="outline" size="sm" asChild className="text-xs">
                       <Link to={`/survey/${survey.id}`}>
                         <Eye className="w-3.5 h-3.5 mr-1" />
