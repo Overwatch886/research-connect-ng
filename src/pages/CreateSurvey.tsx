@@ -243,7 +243,14 @@ const CreateSurvey = () => {
       }
 
       // Persist survey and questions into localStorage for instant demo reliability
-      const localSurveys = JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]");
+      let localSurveys: any[] = [];
+      try {
+        const stored = localStorage.getItem("research_connect_custom_surveys");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) localSurveys = parsed;
+        }
+      } catch {}
       localSurveys.unshift({
         ...surveyData,
         id: publishedId,

@@ -139,15 +139,24 @@ export const TakeSurvey = () => {
     if (!id) return;
 
     // Check custom surveys in local storage first
-    const stored = localStorage.getItem("research_connect_custom_surveys");
-    if (stored) {
-      const customSurveys = JSON.parse(stored);
-      const found = customSurveys.find((s: any) => s.id === id);
-      if (found) {
-        setSurvey(found);
-        return;
+    try {
+      const stored = localStorage.getItem("research_connect_custom_surveys");
+      if (stored) {
+        const customSurveys = JSON.parse(stored);
+        if (Array.isArray(customSurveys)) {
+          const found = customSurveys.find((s: any) => s.id === id);
+          if (found) {
+            setSurvey({
+              ...found,
+              questions: Array.isArray(found.questions) && found.questions.length > 0
+                ? found.questions
+                : (SEED_SURVEYS[found.id]?.questions || SEED_SURVEYS["1"].questions),
+            });
+            return;
+          }
+        }
       }
-    }
+    } catch (e) {}
 
     // Fallback to seed surveys
     if (SEED_SURVEYS[id]) {
@@ -273,7 +282,14 @@ export const TakeSurvey = () => {
       };
 
       // 3. Persist to local recorded responses (deduplicating)
-      const allResponses = JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]");
+      let allResponses: any[] = [];
+      try {
+        const stored = localStorage.getItem("research_connect_recorded_responses");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) allResponses = parsed;
+        }
+      } catch {}
       const filtered = allResponses.filter((r: any) => (r.survey_id || r.id) !== survey.id);
       filtered.unshift(completedResponse);
       localStorage.setItem("research_connect_recorded_responses", JSON.stringify(filtered));
@@ -397,7 +413,7 @@ export const TakeSurvey = () => {
             <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
               <span>Reward Credited:</span>
               <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                +₦{survey.reward_amount.toLocaleString()}
+                +₦{(survey.reward_amount ?? 500).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-emerald-200 dark:border-emerald-800">
@@ -420,9 +436,16 @@ export const TakeSurvey = () => {
   }
 
   // Check if user already took this survey
-  const userResponses = typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]")
-    : [];
+  let userResponses: any[] = [];
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("research_connect_recorded_responses");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) userResponses = parsed;
+      }
+    } catch {}
+  }
   const alreadyCompleted = userResponses.some((r: any) => (r.survey_id || r.id) === survey.id);
 
   if (alreadyCompleted && !isSubmitted) {
@@ -454,9 +477,15 @@ export const TakeSurvey = () => {
   }
 
   // Check if survey was closed or maximum quota reached
-  const globalStatuses = typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("research_connect_survey_statuses") || "{}")
-    : {};
+  let globalStatuses: Record<string, string> = {};
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("research_connect_survey_statuses");
+      if (stored) {
+        globalStatuses = JSON.parse(stored);
+      }
+    } catch {}
+  }
   const isClosed = 
     globalStatuses[survey.id] === "closed" || 
     (survey as any).status === "closed" || 
@@ -528,7 +557,15 @@ export const TakeSurvey = () => {
           <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <GraduationCap className="w-4 h-4 text-indigo-500" />
-              <span>Target: {survey.target_universities?.join(", ") || "All Nigerian Tertiary Institutions"}</span>
+              <span>
+                Target: {
+                  Array.isArray(survey.target_universities)
+                    ? survey.target_universities.join(", ")
+                    : typeof survey.target_universities === "string"
+                      ? survey.target_universities
+                      : "All Nigerian Tertiary Institutions"
+                }
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
               <ShieldCheck className="w-4 h-4" />
@@ -567,18 +604,23 @@ export const TakeSurvey = () => {
           </div>
         </div>
 
-        {surveyMode === "conversational" ? (
-          <ConversationalSurveyor
-            surveyId={survey.id}
-            surveyTitle={survey.title}
-            rewardAmount={survey.reward_amount}
-            questions={survey.questions}
-            onFinish={() => setIsSubmitted(true)}
-          />
-        ) : (
-          /* Survey Form */
-          <form onSubmit={handleSubmit} className="space-y-6">
-          {survey.questions.map((q, idx) => {
+        {(() => {
+          const safeQuestions = Array.isArray(survey.questions) && survey.questions.length > 0
+            ? survey.questions
+            : (SEED_SURVEYS[survey.id]?.questions || SEED_SURVEYS["1"].questions);
+
+          return surveyMode === "conversational" ? (
+            <ConversationalSurveyor
+              surveyId={survey.id}
+              surveyTitle={survey.title}
+              rewardAmount={survey.reward_amount || 500}
+              questions={safeQuestions}
+              onFinish={() => setIsSubmitted(true)}
+            />
+          ) : (
+            /* Survey Form */
+            <form onSubmit={handleSubmit} className="space-y-6">
+            {safeQuestions.map((q, idx) => {
             const audit = auditStates[q.id];
             const isAuditing = auditingField === q.id;
 
@@ -763,18 +805,19 @@ export const TakeSurvey = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Submitting & Crediting ₦{survey.reward_amount}...</span>
+                  <span>Submitting & Crediting ₦{survey.reward_amount ?? 500}...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>Submit & Claim ₦{survey.reward_amount.toLocaleString()}</span>
+                  <span>Submit & Claim ₦{(survey.reward_amount ?? 500).toLocaleString()}</span>
                 </>
               )}
             </Button>
           </div>
         </form>
-        )}
+          );
+        })()}
       </main>
     </div>
   );

@@ -172,7 +172,14 @@ export const WithdrawalModal = ({
       localStorage.setItem("research_connect_user_balance", newBalance.toString());
 
       // Record withdrawal transaction log
-      const withdrawals = JSON.parse(localStorage.getItem("research_connect_withdrawals") || "[]");
+      let withdrawals: any[] = [];
+      try {
+        const stored = localStorage.getItem("research_connect_withdrawals");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) withdrawals = parsed;
+        }
+      } catch {}
       const refCode = channel === "airtime" 
         ? `VTU-AIR-${Math.floor(100000 + Math.random() * 900000)}`
         : `RC-PAY-${Math.floor(100000 + Math.random() * 900000)}`;

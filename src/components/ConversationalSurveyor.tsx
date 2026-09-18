@@ -199,7 +199,14 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
         };
 
         // 3. Save response to localStorage (deduplicating)
-        const recorded = JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]");
+        let recorded: any[] = [];
+        try {
+          const stored = localStorage.getItem("research_connect_recorded_responses");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) recorded = parsed;
+          }
+        } catch {}
         const filtered = recorded.filter((r: any) => (r.survey_id || r.id) !== surveyId);
         filtered.unshift(completedResponse);
         localStorage.setItem("research_connect_recorded_responses", JSON.stringify(filtered));

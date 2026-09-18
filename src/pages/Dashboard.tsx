@@ -88,17 +88,28 @@ const Dashboard = () => {
   });
 
   const displaySurveys = useMemo(() => {
-    const customSurveys = typeof window !== "undefined" 
-      ? JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]").map((s: any) => ({
-          id: s.id,
-          title: s.title,
-          responses: s.current_responses || 0,
-          target: s.max_responses || 50,
-          rewardAmount: s.reward_amount || 500,
-          status: s.status || "active",
-          createdAt: s.created_at ? s.created_at.split("T")[0] : "Today"
-        }))
-      : [];
+    let customSurveys: any[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("research_connect_custom_surveys");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            customSurveys = parsed.map((s: any) => ({
+              id: s.id,
+              title: s.title || "Untitled Survey",
+              responses: s.current_responses || 0,
+              target: s.max_responses || 50,
+              rewardAmount: s.reward_amount || 500,
+              status: s.status || "active",
+              createdAt: s.created_at ? s.created_at.split("T")[0] : "Today"
+            }));
+          }
+        }
+      } catch {
+        customSurveys = [];
+      }
+    }
 
     const combined = [...customSurveys, ...mockSurveys];
 

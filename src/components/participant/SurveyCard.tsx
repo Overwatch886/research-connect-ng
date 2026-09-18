@@ -55,7 +55,7 @@ export const SurveyCard = ({
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <Badge variant="secondary" className="bg-primary/10 text-primary font-semibold">
-              ₦{survey.reward_amount.toLocaleString()}
+              ₦{(survey.reward_amount ?? 500).toLocaleString()}
             </Badge>
             {hasCompleted && (
               <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-semibold flex items-center gap-0.5">
@@ -70,12 +70,12 @@ export const SurveyCard = ({
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Clock className="h-4 w-4" />
-            <span>{survey.estimated_time} mins</span>
+            <span>{survey.estimated_time ?? 5} mins</span>
           </div>
           
           <div className="flex items-center gap-1.5">
             <DollarSign className="h-4 w-4" />
-            <span>₦{survey.reward_amount}</span>
+            <span>₦{survey.reward_amount ?? 500}</span>
           </div>
           
           {spotsRemaining !== null && (

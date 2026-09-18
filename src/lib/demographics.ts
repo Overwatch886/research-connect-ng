@@ -113,7 +113,10 @@ export const getStudentDemographics = (): StudentDemographics => {
   try {
     const raw = localStorage.getItem("research_connect_demographics");
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return { ...DEFAULT_DEMOGRAPHICS, ...parsed };
+      }
     }
   } catch (e) {}
   return DEFAULT_DEMOGRAPHICS;
@@ -150,8 +153,9 @@ export interface DemographicMatchResult {
 
 export const calculateDemographicMatch = (
   survey: any,
-  demographics: StudentDemographics
+  demographics?: StudentDemographics
 ): DemographicMatchResult => {
+  const currentDemo = demographics || DEFAULT_DEMOGRAPHICS;
   const targets = survey?.target_universities;
 
   // Case 1: Survey targets "All Universities", null, or empty -> Open to all
@@ -163,11 +167,12 @@ export const calculateDemographicMatch = (
     };
   }
 
-  const studentUni = demographics.university.toLowerCase();
-  const studentZone = demographics.geopoliticalZone.toLowerCase();
+  const studentUni = (currentDemo.university || DEFAULT_DEMOGRAPHICS.university).toLowerCase();
+  const studentZone = (currentDemo.geopoliticalZone || DEFAULT_DEMOGRAPHICS.geopoliticalZone).toLowerCase();
 
   // Case 2: Survey explicitly targets student's university
   const directMatch = targets.some((t: string) => {
+    if (typeof t !== "string") return false;
     const targetLower = t.toLowerCase();
     return (
       studentUni.includes(targetLower) ||
@@ -181,7 +186,7 @@ export const calculateDemographicMatch = (
   });
 
   if (directMatch) {
-    const cleanName = demographics.university.split("(")[0].trim();
+    const cleanName = (currentDemo.university || "University").split("(")[0].trim();
     return {
       isMatch: true,
       score: 100,
@@ -191,6 +196,7 @@ export const calculateDemographicMatch = (
 
   // Case 3: Survey targets universities in the same geopolitical zone
   const regionalMatch = targets.some((t: string) => {
+    if (typeof t !== "string") return false;
     const mappedZone = UNIVERSITY_ZONE_MAP[t];
     return mappedZone && mappedZone.toLowerCase() === studentZone;
   });
@@ -199,7 +205,7 @@ export const calculateDemographicMatch = (
     return {
       isMatch: true,
       score: 85,
-      matchReason: `Regional Match: ${demographics.geopoliticalZone} Zone`,
+      matchReason: `Regional Match: ${currentDemo.geopoliticalZone || "South-West"} Zone`,
     };
   }
 

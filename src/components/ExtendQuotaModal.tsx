@@ -75,7 +75,11 @@ export const ExtendQuotaModal = ({
       }
 
       // 2. Update manual status override
-      const statusMap = JSON.parse(localStorage.getItem("research_connect_survey_statuses") || "{}");
+      let statusMap: Record<string, string> = {};
+      try {
+        const stored = localStorage.getItem("research_connect_survey_statuses");
+        if (stored) statusMap = JSON.parse(stored);
+      } catch {}
       statusMap[survey.id] = "active";
       localStorage.setItem("research_connect_survey_statuses", JSON.stringify(statusMap));
 
