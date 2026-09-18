@@ -21,6 +21,9 @@ import {
   GeneratedQuestion 
 } from "@/lib/gemini";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 
 interface ConversationalSurveyorProps {
@@ -39,6 +42,8 @@ export const ConversationalSurveyor = ({
   onFinish,
 }: ConversationalSurveyorProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [currentQIndex, setCurrentQIndex] = useState(0);
@@ -152,23 +157,100 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
       setCurrentQIndex(step.nextQuestionIndex);
 
       if (step.isFinished) {
-        // Payout credit
-        const currentBalance = Number(localStorage.getItem("research_connect_user_balance") || "1500");
+        // 1. Payout credit to user wallet
+        const storedBal = localStorage.getItem("research_connect_user_balance");
+        const currentBalance = storedBal !== null ? Number(storedBal) : 0;
         const updated = currentBalance + rewardAmount;
         localStorage.setItem("research_connect_user_balance", updated.toString());
 
-        // Save response
-        const recorded = JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]");
-        recorded.push({
+        // 2. Format complete survey response
+        const completedResponse = {
           id: Date.now().toString(),
           survey_id: surveyId,
-          survey_title: surveyTitle,
-          chat_history: [...messages, userMsg, aiMsg],
-          reward_amount: rewardAmount,
-          reward_paid: true,
+          participant_id: user?.id || "student-participant",
+          status: "completed",
+          started_at: new Date(Date.now() - 300000).toISOString(),
           completed_at: new Date().toISOString(),
-        });
-        localStorage.setItem("research_connect_recorded_responses", JSON.stringify(recorded));
+          reward_paid: true,
+          reward_amount: rewardAmount,
+          survey_title: surveyTitle,
+          surveys: {
+            id: surveyId,
+            title: surveyTitle,
+            reward_amount: rewardAmount,
+            estimated_time: 5,
+            description: "National higher-education academic demographic survey.",
+            researcher_id: "researcher",
+            max_responses: 100,
+            current_responses: 43,
+            status: "active",
+            target_universities: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            expires_at: null,
+          },
+          chat_history: [...messages, userMsg, aiMsg],
+        };
+
+        // 3. Save response to localStorage (deduplicating)
+        const recorded = JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]");
+        const filtered = recorded.filter((r: any) => (r.survey_id || r.id) !== surveyId);
+        filtered.unshift(completedResponse);
+        localStorage.setItem("research_connect_recorded_responses", JSON.stringify(filtered));
+        localStorage.removeItem(`survey_draft_${surveyId}`);
+
+        // 4. Sync with Supabase if logged in
+        if (user?.id) {
+          try {
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("balance")
+              .eq("user_id", user.id)
+              .maybeSingle();
+
+            const newDbBalance = (prof?.balance || 0) + rewardAmount;
+            await supabase
+              .from("profiles")
+              .update({ balance: newDbBalance, updated_at: new Date().toISOString() })
+              .eq("user_id", user.id);
+
+            const { data: existingResp } = await supabase
+              .from("survey_responses")
+              .select("id")
+              .eq("survey_id", surveyId)
+              .eq("participant_id", user.id)
+              .maybeSingle();
+
+            if (existingResp) {
+              await supabase
+                .from("survey_responses")
+                .update({
+                  status: "completed",
+                  completed_at: new Date().toISOString(),
+                  reward_paid: true,
+                })
+                .eq("id", existingResp.id);
+            } else {
+              await supabase
+                .from("survey_responses")
+                .insert({
+                  survey_id: surveyId,
+                  participant_id: user.id,
+                  status: "completed",
+                  started_at: new Date(Date.now() - 300000).toISOString(),
+                  completed_at: new Date().toISOString(),
+                  reward_paid: true,
+                });
+            }
+          } catch (supaErr) {
+            console.warn("Supabase conversational sync skipped:", supaErr);
+          }
+        }
+
+        // 5. Invalidate caches
+        queryClient.invalidateQueries({ queryKey: ["my-responses"] });
+        queryClient.invalidateQueries({ queryKey: ["available-surveys"] });
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
 
         setIsCompleted(true);
         toast({

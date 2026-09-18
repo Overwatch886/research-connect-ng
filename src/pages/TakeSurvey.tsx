@@ -25,6 +25,8 @@ import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { ConversationalSurveyor } from "@/components/ConversationalSurveyor";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Question {
   id: string;
@@ -122,6 +124,7 @@ export const TakeSurvey = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const [survey, setSurvey] = useState<SurveyDetails | null>(null);
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -232,29 +235,107 @@ export const TakeSurvey = () => {
     setIsSubmitting(true);
 
     try {
-      // Reward payout logic: Credit participant wallet balance
-      const currentBalance = Number(localStorage.getItem("research_connect_user_balance") || "1500");
-      const updatedBalance = currentBalance + (survey.reward_amount || 500);
+      const rewardVal = survey.reward_amount || 500;
+
+      // 1. Reward payout logic: Credit participant wallet balance
+      const storedBal = localStorage.getItem("research_connect_user_balance");
+      const currentBalance = storedBal !== null ? Number(storedBal) : 0;
+      const updatedBalance = currentBalance + rewardVal;
       localStorage.setItem("research_connect_user_balance", updatedBalance.toString());
 
-      // Save recorded response
-      const allResponses = JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]");
-      allResponses.push({
+      // 2. Format complete survey response record
+      const completedResponse = {
         id: Date.now().toString(),
         survey_id: survey.id,
-        survey_title: survey.title,
-        answers,
-        reward_paid: true,
-        reward_amount: survey.reward_amount,
+        participant_id: user?.id || "student-participant",
+        status: "completed",
+        started_at: new Date(startTime).toISOString(),
         completed_at: new Date().toISOString(),
-      });
-      localStorage.setItem("research_connect_recorded_responses", JSON.stringify(allResponses));
+        reward_paid: true,
+        reward_amount: rewardVal,
+        survey_title: survey.title,
+        surveys: {
+          id: survey.id,
+          title: survey.title,
+          reward_amount: rewardVal,
+          estimated_time: survey.estimated_time || 5,
+          description: survey.description || "National higher-education academic demographic survey.",
+          researcher_id: "researcher",
+          max_responses: 100,
+          current_responses: 43,
+          status: "active",
+          target_universities: survey.target_universities || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          expires_at: null,
+        },
+        answers,
+      };
+
+      // 3. Persist to local recorded responses (deduplicating)
+      const allResponses = JSON.parse(localStorage.getItem("research_connect_recorded_responses") || "[]");
+      const filtered = allResponses.filter((r: any) => (r.survey_id || r.id) !== survey.id);
+      filtered.unshift(completedResponse);
+      localStorage.setItem("research_connect_recorded_responses", JSON.stringify(filtered));
       localStorage.removeItem(`survey_draft_${survey.id}`);
+
+      // 4. Sync with Supabase if user is logged in
+      if (user?.id) {
+        try {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("balance")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          const newDbBalance = (prof?.balance || 0) + rewardVal;
+          await supabase
+            .from("profiles")
+            .update({ balance: newDbBalance, updated_at: new Date().toISOString() })
+            .eq("user_id", user.id);
+
+          const { data: existingResp } = await supabase
+            .from("survey_responses")
+            .select("id")
+            .eq("survey_id", survey.id)
+            .eq("participant_id", user.id)
+            .maybeSingle();
+
+          if (existingResp) {
+            await supabase
+              .from("survey_responses")
+              .update({
+                status: "completed",
+                completed_at: new Date().toISOString(),
+                reward_paid: true,
+              })
+              .eq("id", existingResp.id);
+          } else {
+            await supabase
+              .from("survey_responses")
+              .insert({
+                survey_id: survey.id,
+                participant_id: user.id,
+                status: "completed",
+                started_at: new Date(startTime).toISOString(),
+                completed_at: new Date().toISOString(),
+                reward_paid: true,
+              });
+          }
+        } catch (supaErr) {
+          console.warn("Supabase background sync skipped:", supaErr);
+        }
+      }
+
+      // 5. Invalidate React Query caches
+      queryClient.invalidateQueries({ queryKey: ["my-responses"] });
+      queryClient.invalidateQueries({ queryKey: ["available-surveys"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
 
       setIsSubmitted(true);
       toast({
         title: "🎉 Reward Earned!",
-        description: `₦${survey.reward_amount.toLocaleString()} credited to your student wallet.`,
+        description: `₦${rewardVal.toLocaleString()} credited to your student wallet.`,
       });
     } catch (err) {
       toast({
@@ -276,7 +357,7 @@ export const TakeSurvey = () => {
   }
 
   if (isSubmitted) {
-    const balance = localStorage.getItem("research_connect_user_balance") || "2000";
+    const balance = localStorage.getItem("research_connect_user_balance") || (survey.reward_amount || 500).toString();
     return (
       <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-card rounded-2xl border border-border p-8 text-center space-y-6 shadow-xl">
@@ -305,11 +386,11 @@ export const TakeSurvey = () => {
           </div>
 
           <div className="flex flex-col gap-2 pt-2">
-            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link to="/surveys">Browse More Paid Surveys</Link>
+            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
+              <Link to="/surveys">View Participant Dashboard & Wallet</Link>
             </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/dashboard">Go to Home</Link>
+            <Button variant="outline" asChild>
+              <Link to="/surveys">Browse More Paid Surveys</Link>
             </Button>
           </div>
         </div>

@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useAvailableSurveys, useMyResponses, useStartSurvey } from "@/hooks/useSurveys";
 import { ParticipantStats } from "@/components/participant/ParticipantStats";
@@ -19,10 +20,12 @@ import { MySurveysList } from "@/components/participant/MySurveysList";
 import { SurveyFilters, SortOption, FilterOption } from "@/components/participant/SurveyFilters";
 import { EarningsCard } from "@/components/participant/EarningsCard";
 import { RecentActivity } from "@/components/participant/RecentActivity";
+import { WithdrawalModal } from "@/components/participant/WithdrawalModal";
 
 const ParticipantDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const { data: surveys, isLoading: surveysLoading } = useAvailableSurveys();
   const { data: responses, isLoading: responsesLoading } = useMyResponses();
@@ -33,30 +36,48 @@ const ParticipantDashboard = () => {
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [filterBy, setFilterBy] = useState<FilterOption>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [localBalanceOverride, setLocalBalanceOverride] = useState<number | null>(null);
 
-  // Calculate stats from responses
+  // Calculate stats from responses and local wallet balance
   const stats = useMemo(() => {
-    if (!responses) return { 
-      totalEarnings: 0, 
-      completedSurveys: 0, 
-      pendingBalance: 0, 
-      inProgressSurveys: 0,
-      availableBalance: profile?.balance || 0
-    };
-    
-    const completed = responses.filter(r => r.status === "completed");
-    const inProgress = responses.filter(r => r.status === "in_progress");
+    const completed = responses ? responses.filter(r => r.status === "completed") : [];
+    const inProgress = responses ? responses.filter(r => r.status === "in_progress") : [];
     const paidResponses = completed.filter(r => r.reward_paid);
     const pendingResponses = completed.filter(r => !r.reward_paid);
-    
+
+    // Calculate total earned from completed surveys
+    const totalEarnedFromSurveys = completed.reduce(
+      (sum, r) => sum + (r.surveys?.reward_amount ?? (r as any).reward_amount ?? 500), 
+      0
+    );
+
+    // Available wallet balance: read from localStorage, local override, or profile
+    let walletBalance = 0;
+    if (localBalanceOverride !== null) {
+      walletBalance = localBalanceOverride;
+    } else if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("research_connect_user_balance");
+      if (stored !== null) {
+        walletBalance = Number(stored);
+      } else {
+        walletBalance = Math.max(profile?.balance || 0, totalEarnedFromSurveys);
+        localStorage.setItem("research_connect_user_balance", walletBalance.toString());
+      }
+    } else {
+      walletBalance = Math.max(profile?.balance || 0, totalEarnedFromSurveys);
+    }
+
+    const totalEarnings = Math.max(totalEarnedFromSurveys, walletBalance);
+
     return {
-      totalEarnings: paidResponses.reduce((sum, r) => sum + (r.surveys?.reward_amount || 0), 0),
+      totalEarnings,
       completedSurveys: completed.length,
-      pendingBalance: pendingResponses.reduce((sum, r) => sum + (r.surveys?.reward_amount || 0), 0),
+      pendingBalance: pendingResponses.reduce((sum, r) => sum + (r.surveys?.reward_amount ?? (r as any).reward_amount ?? 0), 0),
       inProgressSurveys: inProgress.length,
-      availableBalance: profile?.balance || 0,
+      availableBalance: walletBalance,
     };
-  }, [responses, profile?.balance]);
+  }, [responses, profile?.balance, localBalanceOverride]);
 
   // Filter and sort surveys
   const filteredSurveys = useMemo(() => {
@@ -147,10 +168,23 @@ const ParticipantDashboard = () => {
     return result;
   }, [surveys, searchQuery, sortBy, filterBy]);
 
-  // Get IDs of surveys the user has already started
-  const startedSurveyIds = useMemo(() => {
+  // Differentiate between completed and in-progress survey IDs
+  const completedSurveyIds = useMemo(() => {
     if (!responses) return new Set<string>();
-    return new Set(responses.map(r => r.survey_id));
+    return new Set(
+      responses
+        .filter(r => r.status === "completed")
+        .map(r => r.survey_id || r.surveys?.id)
+    );
+  }, [responses]);
+
+  const inProgressSurveyIds = useMemo(() => {
+    if (!responses) return new Set<string>();
+    return new Set(
+      responses
+        .filter(r => r.status === "in_progress")
+        .map(r => r.survey_id || r.surveys?.id)
+    );
   }, [responses]);
 
   const handleStartSurvey = async (surveyId: string) => {
@@ -172,10 +206,7 @@ const ParticipantDashboard = () => {
   };
 
   const handleWithdraw = () => {
-    toast({
-      title: "Withdrawal Request",
-      description: "Withdrawal feature coming soon! Your funds are safe.",
-    });
+    setIsWithdrawModalOpen(true);
   };
 
   // Redirect if not verified
@@ -353,7 +384,8 @@ const ParticipantDashboard = () => {
                         survey={survey}
                         onStart={handleStartSurvey}
                         isStarting={startingSurveyId === survey.id}
-                        hasStarted={startedSurveyIds.has(survey.id)}
+                        hasStarted={inProgressSurveyIds.has(survey.id)}
+                        hasCompleted={completedSurveyIds.has(survey.id)}
                       />
                     ))}
                   </div>
@@ -401,6 +433,16 @@ const ParticipantDashboard = () => {
           </div>
         </div>
       </main>
+
+      <WithdrawalModal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        availableBalance={stats.availableBalance}
+        defaultName={profile?.full_name || "STUDENT ACCOUNT"}
+        onWithdrawSuccess={(newBal) => {
+          setLocalBalanceOverride(newBal);
+        }}
+      />
 
       <Footer />
     </div>

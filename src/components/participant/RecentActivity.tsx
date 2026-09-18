@@ -24,35 +24,39 @@ export const RecentActivity = ({ responses }: RecentActivityProps) => {
   const activities: Activity[] = responses
     .flatMap((response) => {
       const items: Activity[] = [];
+      const title = response.surveys?.title || (response as any).survey_title || "Academic Demographic Survey";
+      const amount = response.surveys?.reward_amount ?? (response as any).reward_amount ?? 500;
+      const startedAt = response.started_at || new Date().toISOString();
+      const completedAt = response.completed_at || startedAt;
       
       // Started activity
       items.push({
         id: `${response.id}-started`,
         type: "started",
-        title: response.surveys.title,
-        amount: response.surveys.reward_amount,
-        timestamp: response.started_at,
+        title,
+        amount,
+        timestamp: startedAt,
       });
       
       // Completed activity
-      if (response.status === "completed" && response.completed_at) {
+      if (response.status === "completed" && completedAt) {
         items.push({
           id: `${response.id}-completed`,
           type: "completed",
-          title: response.surveys.title,
-          amount: response.surveys.reward_amount,
-          timestamp: response.completed_at,
+          title,
+          amount,
+          timestamp: completedAt,
         });
       }
       
       // Paid activity (if applicable)
-      if (response.reward_paid && response.completed_at) {
+      if (response.reward_paid && completedAt) {
         items.push({
           id: `${response.id}-paid`,
           type: "paid",
-          title: response.surveys.title,
-          amount: response.surveys.reward_amount,
-          timestamp: response.completed_at, // Using completed_at as proxy
+          title,
+          amount,
+          timestamp: completedAt,
         });
       }
       
@@ -131,7 +135,13 @@ export const RecentActivity = ({ responses }: RecentActivityProps) => {
                 <div className="flex-grow min-w-0">
                   <p className="text-sm font-medium truncate">{activity.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                    {(() => {
+                      try {
+                        return formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
+                      } catch (e) {
+                        return "recently";
+                      }
+                    })()}
                   </p>
                 </div>
                 <div className="flex-shrink-0 flex items-center gap-2">
