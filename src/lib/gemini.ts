@@ -40,7 +40,7 @@ export const handleGeminiError = (err: any) => {
   }
 };
 
-export const getPreferredGeminiModel = (genAI: GoogleGenerativeAI, modelName: string = "gemini-2.0-flash") => {
+export const getPreferredGeminiModel = (genAI: GoogleGenerativeAI, modelName: string = "gemini-1.5-flash") => {
   try {
     return genAI.getGenerativeModel({ model: modelName });
   } catch {
@@ -74,9 +74,11 @@ export const extractJson = <T>(text: string): T => {
 // ---------------------------------------------------------------------------
 
 export const GEMINI_MODEL_CANDIDATES = [
-  "gemini-2.0-flash",
+  "gemini-1.5-flash",
   "gemini-2.5-flash",
+  "gemini-1.5-pro",
   "gemini-flash-latest",
+  "gemini-2.0-flash-exp",
 ];
 
 const DEFAULT_GEMINI_MODEL = GEMINI_MODEL_CANDIDATES[0];
@@ -97,7 +99,7 @@ const isQuotaError = (err: any, msg: string): boolean =>
   err?.status === 429 || /429|resource_exhausted|quota|rate limit|too many requests/i.test(msg);
 
 const isUnknownModelError = (msg: string): boolean =>
-  /not found|not supported|is not found for api version|does not exist|unknown model/i.test(msg);
+  /not found|not supported|is not found for api version|does not exist|unknown model|no longer available|not available|deprecated|404/i.test(msg);
 
 async function callGeminiDirect(apiKey: string, prompt: string, model: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -117,7 +119,10 @@ async function callGeminiDirect(apiKey: string, prompt: string, model: string): 
         handleGeminiError(err);
         throw new GeminiError("quota", "Your Gemini API key has hit its Google AI Studio rate limit.");
       }
-      if (isUnknownModelError(msg)) continue;
+      if (isUnknownModelError(msg)) {
+        console.warn(`Model ${candidate} unavailable (${msg}). Trying next fallback candidate...`);
+        continue;
+      }
       throw err;
     }
   }

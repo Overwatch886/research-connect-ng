@@ -9,7 +9,7 @@ const CONFIGURED_MODEL = Deno.env.get("GEMINI_MODEL");
 
 const MODEL_CANDIDATES = CONFIGURED_MODEL
   ? [CONFIGURED_MODEL]
-  : ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+  : ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-flash-latest", "gemini-2.0-flash-exp"];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +26,7 @@ const isQuotaMessage = (message: string): boolean =>
   /quota|rate limit|resource_exhausted|too many requests|exceeded/i.test(message);
 
 const isUnknownModelMessage = (message: string): boolean =>
-  /not found|not supported|is not found for api version|does not exist|unknown model/i.test(message);
+  /not found|not supported|is not found for api version|does not exist|unknown model|no longer available|not available|deprecated|404/i.test(message);
 
 interface GeminiRequestBody {
   prompt?: string;
