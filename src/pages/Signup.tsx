@@ -15,6 +15,8 @@ const Signup = () => {
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [resending, setResending] = useState(false);
   const [role, setRole] = useState<"researcher" | "participant">(initialRole as "researcher" | "participant");
   const [formData, setFormData] = useState({
     fullName: "",
@@ -70,9 +72,17 @@ const Signup = () => {
         },
       });
 
-      if (error) throw error;
-
       if (data.user) {
+        // If email confirmation is required by Supabase, session is null
+        if (!data.session) {
+          setVerificationSent(true);
+          toast({
+            title: "Verification Email Sent!",
+            description: `Please check ${formData.email} to confirm your account before signing in.`,
+          });
+          return;
+        }
+
         toast({
           title: "Account created!",
           description: "Welcome to ResearchNaija. Redirecting to dashboard...",
@@ -102,6 +112,32 @@ const Signup = () => {
     }
   };
 
+  const handleResend = async () => {
+    if (!formData.email) return;
+    setResending(true);
+    try {
+      await supabase.auth.resend({
+        type: "signup",
+        email: formData.email,
+        options: {
+          emailRedirectTo: window.location.origin,
+        },
+      });
+      toast({
+        title: "Verification Email Resent",
+        description: `We've resent the verification link to ${formData.email}.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Resend Failed",
+        description: err.message || "Failed to resend email. Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Form */}
@@ -117,7 +153,53 @@ const Signup = () => {
             </span>
           </Link>
 
-          {/* Header */}
+          {verificationSent ? (
+            <div className="bg-card rounded-2xl border border-border p-6 text-center space-y-6 shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto ring-8 ring-primary/5">
+                <Mail className="w-8 h-8 animate-pulse" />
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold font-display text-foreground">
+                  Verify your email
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  We've sent a verification link to <strong className="text-foreground">{formData.email}</strong>. Please check your inbox and click the link to confirm your account.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-muted/60 text-xs text-muted-foreground border space-y-1 text-left">
+                <p className="font-semibold text-foreground">Can't find the email?</p>
+                <p>Check your spam or promotions folder. It usually arrives within 1-2 minutes.</p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <Button asChild className="w-full">
+                  <Link to="/login">
+                    Go to Sign In <ArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResend}
+                  disabled={resending}
+                >
+                  {resending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Resending Email...
+                    </>
+                  ) : (
+                    "Resend Verification Link"
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Header */}
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground mb-2">
               Create your account
@@ -273,6 +355,8 @@ const Signup = () => {
               Sign in
             </Link>
           </p>
+            </>
+          )}
         </div>
       </div>
 
