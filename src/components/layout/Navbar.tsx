@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, FileText, Users, Shield, CreditCard } from "lucide-react";
+import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,6 +44,7 @@ const Navbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
+            <GeminiKeyModal variant="badge" />
             <Button variant="ghost" asChild>
               <Link to="/login">Sign In</Link>
             </Button>

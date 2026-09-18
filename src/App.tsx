@@ -14,6 +14,7 @@ import VerifyStudent from "./pages/VerifyStudent";
 import VerifyEmail from "./pages/VerifyEmail";
 import ParticipantDashboard from "./pages/ParticipantDashboard";
 import Pricing from "./pages/Pricing";
+import TakeSurvey from "./pages/TakeSurvey";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/survey/:id" element={<TakeSurvey />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

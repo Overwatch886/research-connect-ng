@@ -21,8 +21,11 @@ import {
   LogOut,
   ShieldAlert,
   ShieldCheck,
-  Loader2
+  Loader2,
+  Sparkles
 } from "lucide-react";
+import { GeminiKeyModal } from "@/components/GeminiKeyModal";
+import { AiInsightsModal } from "@/components/AiInsightsModal";
 
 // Mock data for demonstration
 const mockSurveys = [
@@ -54,9 +57,23 @@ const mockSurveys = [
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSurveyForInsights, setSelectedSurveyForInsights] = useState<{ title: string; responses: number } | null>(null);
   const { user, signOut, isLoading: authLoading } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
+
+  const customSurveys = typeof window !== "undefined" 
+    ? JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]").map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        responses: s.current_responses || 38,
+        target: s.max_responses || 50,
+        status: s.status || "active",
+        createdAt: s.created_at ? s.created_at.split("T")[0] : "Today"
+      }))
+    : [];
+
+  const displaySurveys = [...customSurveys, ...mockSurveys];
 
   const handleLogout = async () => {
     await signOut();
@@ -174,6 +191,7 @@ const Dashboard = () => {
             </div>
 
             <div className="flex items-center gap-4">
+              <GeminiKeyModal variant="badge" />
               <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
                 <Bell className="w-5 h-5 text-muted-foreground" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
@@ -294,7 +312,7 @@ const Dashboard = () => {
             </div>
 
             <div className="divide-y divide-border">
-              {mockSurveys.map((survey) => (
+              {displaySurveys.map((survey) => (
                 <div key={survey.id} className="p-6 flex items-center justify-between hover:bg-muted/50 transition-colors">
                   <div className="flex-1">
                     <h3 className="font-medium text-foreground mb-1">{survey.title}</h3>
@@ -311,25 +329,30 @@ const Dashboard = () => {
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="w-32 mr-8">
+                  <div className="w-32 mr-6 hidden sm:block">
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${(survey.responses / survey.target) * 100}%` }}
+                        style={{ width: `${Math.min((survey.responses / survey.target) * 100, 100)}%` }}
                       />
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon">
-                      <Eye className="w-4 h-4" />
+                    <Button
+                      size="sm"
+                      onClick={() => setSelectedSurveyForInsights({ title: survey.title, responses: survey.responses })}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 text-xs font-semibold shadow-sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>AI Insights</span>
                     </Button>
-                    <Button variant="ghost" size="icon">
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="w-4 h-4" />
+                    <Button variant="outline" size="sm" asChild className="text-xs">
+                      <Link to={`/survey/${survey.id}`}>
+                        <Eye className="w-3.5 h-3.5 mr-1" />
+                        Take
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -337,6 +360,16 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Gemini Executive Insights Modal */}
+        {selectedSurveyForInsights && (
+          <AiInsightsModal
+            open={!!selectedSurveyForInsights}
+            onOpenChange={(open) => !open && setSelectedSurveyForInsights(null)}
+            surveyTitle={selectedSurveyForInsights.title}
+            responseCount={selectedSurveyForInsights.responses}
+          />
+        )}
       </main>
     </div>
   );

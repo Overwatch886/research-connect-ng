@@ -59,9 +59,48 @@ const ParticipantDashboard = () => {
 
   // Filter and sort surveys
   const filteredSurveys = useMemo(() => {
-    if (!surveys) return [];
-    
-    let result = [...surveys];
+    const localSurveys = JSON.parse(localStorage.getItem("research_connect_custom_surveys") || "[]");
+    const seedDefaults: any[] = [
+      {
+        id: "1",
+        researcher_id: "seed-1",
+        title: "Impact of Mobile Banking Apps on Student Budgets",
+        description: "A nationwide investigation on how fintech apps (OPay, Kuda, Moniepoint) shape daily financial habits among university students in Nigeria.",
+        reward_amount: 500,
+        estimated_time: 4,
+        max_responses: 100,
+        current_responses: 42,
+        status: "active",
+        target_universities: ["University of Lagos", "University of Ibadan"],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        expires_at: null,
+      },
+      {
+        id: "2",
+        researcher_id: "seed-2",
+        title: "Campus Electric Power Outages & Academic Workarounds",
+        description: "Evaluating how Nigerian undergraduates navigate electricity instability, generator noise, and phone/laptop charging centers during semester weeks.",
+        reward_amount: 750,
+        estimated_time: 5,
+        max_responses: 150,
+        current_responses: 89,
+        status: "active",
+        target_universities: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        expires_at: null,
+      },
+    ];
+
+    const combined = [...localSurveys, ...(surveys && surveys.length > 0 ? surveys : seedDefaults)];
+    // Deduplicate by id
+    const seen = new Set<string>();
+    let result = combined.filter((s: any) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -116,27 +155,19 @@ const ParticipantDashboard = () => {
   const handleStartSurvey = async (surveyId: string) => {
     setStartingSurveyId(surveyId);
     try {
-      await startSurvey.mutateAsync(surveyId);
-      toast({
-        title: "Survey Started",
-        description: "Good luck! Complete the survey to earn your reward.",
-      });
+      if (user?.id) {
+        await startSurvey.mutateAsync(surveyId).catch(() => {});
+      }
+      navigate(`/survey/${surveyId}`);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to start survey",
-        variant: "destructive",
-      });
+      navigate(`/survey/${surveyId}`);
     } finally {
       setStartingSurveyId(null);
     }
   };
 
-  const handleContinueSurvey = (responseId: string) => {
-    toast({
-      title: "Continue Survey",
-      description: "Survey taking interface coming soon!",
-    });
+  const handleContinueSurvey = (responseId: string, surveyId?: string) => {
+    navigate(`/survey/${surveyId || responseId}`);
   };
 
   const handleWithdraw = () => {
