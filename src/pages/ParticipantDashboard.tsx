@@ -41,7 +41,7 @@ const ParticipantDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [startingSurveyId, setStartingSurveyId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("newest");
-  const [filterBy, setFilterBy] = useState<FilterOption>("all");
+  const [filterBy, setFilterBy] = useState<FilterOption>("eligible");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isDemographicsModalOpen, setIsDemographicsModalOpen] = useState(false);
@@ -192,8 +192,14 @@ const ParticipantDashboard = () => {
     
     // Apply category filter
     switch (filterBy) {
-      case "matched":
+      case "direct-match":
+        result = result.filter(s => (matchMap[s.id]?.score || 0) === 100 && matchMap[s.id]?.isMatch);
+        break;
+      case "eligible":
         result = result.filter(s => matchMap[s.id]?.isMatch);
+        break;
+      case "all-including-ineligible":
+        // show everything including ineligible surveys
         break;
       case "high-reward":
         result = result.filter(s => s.reward_amount >= 500);
@@ -204,6 +210,8 @@ const ParticipantDashboard = () => {
       case "limited":
         result = result.filter(s => s.max_responses !== null && (s.max_responses - s.current_responses) <= 10);
         break;
+      default:
+        result = result.filter(s => matchMap[s.id]?.isMatch);
     }
     
     // Apply sorting: newest also prioritizes direct demographic matches first
@@ -446,17 +454,17 @@ const ParticipantDashboard = () => {
                     <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="font-semibold text-lg mb-2">No surveys available</h3>
                     <p className="text-muted-foreground">
-                      {searchQuery || filterBy !== "all" 
+                      {searchQuery || filterBy !== "eligible" 
                         ? "Try adjusting your filters or search term" 
                         : "Check back later for new surveys"}
                     </p>
-                    {(searchQuery || filterBy !== "all") && (
+                    {(searchQuery || filterBy !== "eligible") && (
                       <Button 
                         variant="outline" 
                         className="mt-4"
                         onClick={() => {
                           setSearchQuery("");
-                          setFilterBy("all");
+                          setFilterBy("eligible");
                         }}
                       >
                         Clear Filters

@@ -28,6 +28,7 @@ import {
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,6 +36,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
+  const { toast } = useToast();
 
   // Determine current portal mode based on route
   const isResearcherPortal = location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/create-survey");
@@ -42,6 +44,10 @@ const Navbar = () => {
 
   const handleSignOut = async () => {
     await signOut();
+    toast({
+      title: "Signed Out Successfully",
+      description: "You have been logged out of your account.",
+    });
     navigate("/");
   };
 

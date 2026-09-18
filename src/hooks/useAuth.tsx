@@ -42,7 +42,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Supabase auth.signOut error:", err);
+    }
+    // Clean up all Supabase auth tokens in localStorage
+    try {
+      if (typeof window !== "undefined") {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith("sb-") || key.includes("supabase.auth"))) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Immediately reset React auth state to trigger re-render across UI
+    setUser(null);
+    setSession(null);
   };
 
   return (

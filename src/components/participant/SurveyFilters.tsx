@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export type SortOption = "newest" | "reward-high" | "reward-low" | "time-short" | "time-long";
-export type FilterOption = "all" | "matched" | "high-reward" | "quick" | "limited";
+export type FilterOption = "eligible" | "direct-match" | "high-reward" | "quick" | "limited" | "all-including-ineligible";
 
 interface SurveyFiltersProps {
   sortBy: SortOption;
@@ -30,11 +30,12 @@ const sortLabels: Record<SortOption, string> = {
 };
 
 const filterLabels: Record<FilterOption, string> = {
-  "all": "All Surveys",
-  "matched": "🎯 Matched For Me",
+  "eligible": "Eligible For You",
+  "direct-match": "Direct Campus Match (100%)",
   "high-reward": "High Reward (₦500+)",
   "quick": "Quick (< 10 min)",
   "limited": "Limited Spots",
+  "all-including-ineligible": "All (Including Ineligible)",
 };
 
 export const SurveyFilters = ({
@@ -92,21 +93,22 @@ export const SurveyFilters = ({
           <DropdownMenuLabel>Filter</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuRadioGroup value={filterBy} onValueChange={(v) => onFilterChange(v as FilterOption)}>
-            <DropdownMenuRadioItem value="all">All Surveys</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="matched">🎯 Matched For Me</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="high-reward">High Reward (₦500+)</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="quick">Quick (&lt; 10 min)</DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="limited">Limited Spots</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="eligible">🎯 Eligible For You</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="direct-match">🏫 Direct Campus Match (100%)</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="high-reward">💰 High Reward (₦500+)</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="quick">⚡ Quick (&lt; 10 min)</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="limited">🔥 Limited Spots</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="all-including-ineligible">🌐 All (Including Ineligible)</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
 
       {/* Active Filter Badge */}
-      {filterBy !== "all" && (
+      {filterBy !== "eligible" && (
         <Badge 
           variant="secondary" 
           className="cursor-pointer hover:bg-secondary/80"
-          onClick={() => onFilterChange("all")}
+          onClick={() => onFilterChange("eligible")}
         >
           {filterLabels[filterBy]} ✕
         </Badge>

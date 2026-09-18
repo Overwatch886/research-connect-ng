@@ -41,10 +41,10 @@ export const SurveyCard = ({
                   className={`text-[10px] font-semibold py-0.5 px-2 flex items-center gap-1 shrink-0 ${
                     matchInfo.isMatch
                       ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300"
-                      : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                      : "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300"
                   }`}
                 >
-                  <span>🎯</span>
+                  <span>{matchInfo.isMatch ? "🎯" : "🔒"}</span>
                   <span>{matchInfo.matchReason}</span>
                 </Badge>
               )}
@@ -105,6 +105,14 @@ export const SurveyCard = ({
           >
             {isStarting ? "Resuming..." : "Continue Survey"}
             <ArrowRight className="h-4 w-4" />
+          </Button>
+        ) : matchInfo && !matchInfo.isMatch ? (
+          <Button 
+            variant="outline"
+            className="w-full gap-2 border-muted-foreground/30 text-muted-foreground bg-muted/40 font-medium cursor-not-allowed"
+            disabled={true}
+          >
+            <span>🔒 Ineligible for Your Demographic Profile</span>
           </Button>
         ) : (
           <Button 
