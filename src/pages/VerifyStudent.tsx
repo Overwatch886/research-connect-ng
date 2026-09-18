@@ -179,6 +179,48 @@ const VerifyStudent = () => {
     }
   };
 
+  const handleInstantVerify = async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const selectedUni = university || "University of Lagos (UNILAG)";
+      const matricId = studentId || "2023/DEMO-99";
+
+      // Direct profile update
+      await supabase
+        .from("profiles")
+        .update({
+          is_verified: true,
+          university: selectedUni,
+          student_id: matricId,
+          verification_method: "student_id",
+          verified_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+
+      await supabase.rpc("verify_student_by_id", {
+        p_user_id: user.id,
+        p_university: selectedUni,
+        p_student_id: matricId,
+      }).catch(() => {});
+
+      await refetchProfile();
+      setStep("success");
+      toast({
+        title: "⚡ Student Status Verified!",
+        description: `Verified for ${selectedUni}. You can now take surveys!`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Verification Error",
+        description: e.message || "Failed to complete verification.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!university) {
       toast({
@@ -297,12 +339,38 @@ const VerifyStudent = () => {
                     <CreditCard className="w-6 h-6 text-secondary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground mb-1">Student ID</h3>
+                    <h3 className="font-semibold text-foreground mb-1">Student ID / Matric</h3>
                     <p className="text-sm text-muted-foreground">
-                      Verify using your matriculation number
+                      Verify using your matriculation number (Instant)
                     </p>
                   </div>
                 </button>
+
+                <div className="pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={handleInstantVerify}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-between p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30 hover:bg-indigo-100/60 dark:hover:bg-indigo-950/60 transition-all text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                        <ShieldCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm text-foreground">
+                          ⚡ Instant Verification (Demo Mode)
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          One-click bypass for hackathon judging & testing
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                      Verify Now →
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -459,9 +527,20 @@ const VerifyStudent = () => {
                   try again
                 </button>
               </div>
-              <Button variant="outline" asChild>
-                <Link to="/dashboard">Return to Dashboard</Link>
-              </Button>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <Button
+                  type="button"
+                  onClick={handleInstantVerify}
+                  disabled={isLoading}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white w-full"
+                >
+                  ⚡ Complete Verification Instantly (Demo Bypass)
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/dashboard">Return to Dashboard</Link>
+                </Button>
+              </div>
             </div>
           )}
 
