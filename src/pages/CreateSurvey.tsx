@@ -110,6 +110,7 @@ const CreateSurvey = () => {
   const [showAiModal, setShowAiModal] = useState(false);
   const [showFundingModal, setShowFundingModal] = useState(false);
   const [fundingMode, setFundingMode] = useState<"paid" | "karma">("paid");
+  const [isPublishing, setIsPublishing] = useState(false);
   const userCredits = Number(localStorage.getItem("research_connect_peer_credits") || "12");
 
   const studentRewardPool = rewardAmount * targetResponses;
