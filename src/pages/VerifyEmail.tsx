@@ -76,7 +76,7 @@ const VerifyEmail = () => {
               <FileText className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-display font-bold text-foreground">
-              Research<span className="text-primary">Naija</span>
+              Research<span className="text-primary">Connect</span>
             </span>
           </Link>
         </div>

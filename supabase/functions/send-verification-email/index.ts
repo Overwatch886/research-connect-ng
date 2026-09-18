@@ -98,9 +98,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email via Resend
     const emailResponse = await resend.emails.send({
-      from: "SurveyNaija <onboarding@resend.dev>",
+      from: "Research Connect NG <onboarding@resend.dev>",
       to: [email],
-      subject: "Verify Your Student Email - SurveyNaija",
+      subject: "Verify Your Student Email - Research Connect NG",
       html: `
         <!DOCTYPE html>
         <html>
@@ -110,13 +110,13 @@ const handler = async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #16a34a; margin: 0;">SurveyNaija</h1>
+            <h1 style="color: #16a34a; margin: 0;">Research Connect NG</h1>
             <p style="color: #666; margin-top: 5px;">Student Verification</p>
           </div>
           
           <div style="background: #f9fafb; border-radius: 12px; padding: 30px; margin-bottom: 20px;">
             <h2 style="margin-top: 0; color: #111;">Verify Your Student Email</h2>
-            <p>You're almost there! Click the button below to verify your student email and unlock access to paid surveys on SurveyNaija.</p>
+            <p>You're almost there! Click the button below to verify your student email and unlock access to paid surveys on Research Connect NG.</p>
             
             <p><strong>University:</strong> ${university}</p>
             <p><strong>Email:</strong> ${email}</p>

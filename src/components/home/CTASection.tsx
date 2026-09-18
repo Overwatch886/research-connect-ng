@@ -24,7 +24,7 @@ const CTASection = () => {
           
           <p className="text-lg text-primary-foreground/70 mb-10 max-w-xl mx-auto">
             Whether you're conducting research or participating in studies, 
-            ResearchNaija makes it simple, secure, and rewarding.
+            Research Connect makes it simple, secure, and rewarding.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

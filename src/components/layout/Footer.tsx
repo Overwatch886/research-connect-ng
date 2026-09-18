@@ -13,7 +13,7 @@ const Footer = () => {
                 <FileText className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="font-display font-bold text-xl">
-                Research<span className="text-primary">Naija</span>
+                Research<span className="text-primary">Connect</span>
               </span>
             </Link>
             <p className="text-background/60 text-sm">
@@ -106,7 +106,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="mailto:support@researchnaija.com" className="text-background/60 hover:text-background text-sm transition-colors flex items-center gap-2">
+                <a href="mailto:support@researchconnect.ng" className="text-background/60 hover:text-background text-sm transition-colors flex items-center gap-2">
                   <Mail className="w-4 h-4" />
                   Contact Us
                 </a>
@@ -118,7 +118,7 @@ const Footer = () => {
         <div className="mt-12 pt-8 border-t border-background/10">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-background/40 text-sm">
-              © 2025 ResearchNaija. All rights reserved.
+              © 2025 Research Connect NG. All rights reserved.
             </p>
             <p className="text-background/40 text-sm">
               Made with 💚 for Nigerian Students

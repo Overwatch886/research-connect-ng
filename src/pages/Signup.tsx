@@ -86,7 +86,7 @@ const Signup = () => {
         const targetPath = role === "participant" ? "/surveys" : "/dashboard";
         toast({
           title: "Account created!",
-          description: `Welcome to ResearchNaija. Redirecting to ${role === "participant" ? "Student Earner" : "Researcher"} portal...`,
+          description: `Welcome to Research Connect. Redirecting to ${role === "participant" ? "Student Earner" : "Researcher"} portal...`,
         });
         navigate(targetPath);
       }
@@ -150,7 +150,7 @@ const Signup = () => {
               <FileText className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-display font-bold text-xl text-foreground">
-              Research<span className="text-primary">Naija</span>
+              Research<span className="text-primary">Connect</span>
             </span>
           </Link>
 

@@ -67,7 +67,7 @@ const Login = () => {
               <FileText className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-display font-bold text-xl text-foreground">
-              Research<span className="text-primary">Naija</span>
+              Research<span className="text-primary">Connect</span>
             </span>
           </Link>
 

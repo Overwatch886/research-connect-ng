@@ -73,7 +73,7 @@ const Navbar = () => {
               <FileText className="w-5 h-5 text-white" />
             </div>
             <span className="font-display font-bold text-lg text-foreground">
-              Research<span className="text-indigo-600 dark:text-indigo-400">Naija</span>
+              Research<span className="text-indigo-600 dark:text-indigo-400">Connect</span>
             </span>
           </Link>
 
