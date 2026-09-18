@@ -62,11 +62,10 @@ export const MySurveysList = ({ responses, onContinue }: MySurveysListProps) => 
               {response.status === "in_progress" && (
                 <Button 
                   size="sm" 
-                  variant="outline" 
-                  className="gap-1"
-                  onClick={() => onContinue(response.id)}
+                  className="gap-1 bg-amber-600 hover:bg-amber-700 text-white font-medium"
+                  onClick={() => onContinue(response.surveys?.id || response.survey_id || response.id)}
                 >
-                  Continue <ExternalLink className="h-3 w-3" />
+                  Continue Survey <ExternalLink className="h-3 w-3 ml-1" />
                 </Button>
               )}
             </div>

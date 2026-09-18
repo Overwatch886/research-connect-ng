@@ -39,6 +39,27 @@ export const handleGeminiError = (err: any) => {
   }
 };
 
+export const getPreferredGeminiModel = (genAI: GoogleGenerativeAI, modelName: string = "gemini-2.0-flash") => {
+  try {
+    return genAI.getGenerativeModel({ model: modelName });
+  } catch {
+    return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  }
+};
+
+export const extractJson = <T>(text: string): T => {
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    const match = text.match(/[\{\[][\s\S]*[\}\]]/);
+    if (match) {
+      return JSON.parse(match[0]);
+    }
+    throw e;
+  }
+};
+
 // Interface definitions
 export interface ClarificationQuestion {
   id: string;
@@ -119,7 +140,7 @@ export const generateClarificationQuestions = async (
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = getPreferredGeminiModel(genAI);
 
     const prompt = `You are a research methodologist specializing in Nigerian higher education and demographic studies.
 The user wants to conduct a study on the following topic:
@@ -139,10 +160,10 @@ Do not include markdown backticks or any explanatory text. Just the raw JSON.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
-    const cleanJson = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
-    return JSON.parse(cleanJson);
+    return extractJson<ClarificationQuestion[]>(text);
   } catch (err) {
     console.warn("Gemini API call failed, using fallback", err);
+    handleGeminiError(err);
     return getFallbackClarifications(topic);
   }
 };
@@ -160,18 +181,20 @@ export const generateSurveyFromClarifications = async (
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = getPreferredGeminiModel(genAI);
 
     const clarificationsSummary = Object.entries(clarifications)
       .map(([k, v]) => `- ${k}: ${v}`)
       .join("\n");
 
-    const prompt = `You are an expert Nigerian academic methodologist.
-Topic: "${topic}"
-Researcher preferences:
+    const prompt = `You are an expert Nigerian academic methodologist and demographic researcher.
+Topic to investigate: "${topic}"
+Researcher preferences & variables:
 ${clarificationsSummary}
 
-Generate a comprehensive survey with 4 to 6 questions specifically addressing Nigerian students (power cuts, campus shuttle transport, cafeteria inflation, peer payments like OPay/PalmPay/Kuda).
+Generate a comprehensive academic survey with 4 to 6 questions specifically addressing Nigerian university students.
+The questions MUST be deeply and directly aligned with the specific topic: "${topic}".
+Do not default to generic fuel subsidy or transport questions unless the topic is specifically about transportation or subsidies!
 For EACH question, include:
 - "rationale": 1 sentence explaining the scientific or analytical reason why this question is necessary.
 - "dataExtracted": The exact independent or dependent variable measured.
@@ -199,10 +222,10 @@ Do not include markdown codeblocks or extra text. Only raw JSON.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
-    const cleanJson = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
-    return JSON.parse(cleanJson);
+    return extractJson<GeneratedSurvey>(text);
   } catch (err) {
     console.warn("Gemini survey generation failed, using intelligent fallback", err);
+    handleGeminiError(err);
     return getFallbackSurvey(topic, clarifications);
   }
 };
@@ -225,13 +248,13 @@ export const conductConversationalStep = async (
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = getPreferredGeminiModel(genAI);
 
     const formattedHistory = history
       .map((h) => `${h.sender === "user" ? "Student" : "Interviewer"}: ${h.text}`)
       .join("\n");
 
-    const prompt = `You are "Ada", an empathetic, intelligent Nigerian academic field researcher conducting an interactive interview for the study: "${surveyTitle}".
+    const prompt = `You are "Ada", an empathetic, intelligent Nigerian academic field researcher conducting an interactive conversational survey for the study: "${surveyTitle}".
 Current Question to investigate: "${currentQ?.title || "Final thoughts"}"
 Target Research Objective: "${currentQ?.rationale || "Student context"}"
 
@@ -239,35 +262,41 @@ Recent conversation:
 ${formattedHistory}
 Latest student answer: "${userMessage}"
 
-Tasks:
-1. Acknowledge what the student just shared with authentic Nigerian empathy (you may naturally use occasional common phrases like "I hear you", "That makes sense", "That's quite a challenge").
-2. If their answer is too short or vague (e.g. "it was fine", "ok", "nothing"), gently probe for a specific example before moving on.
-3. If their answer was clear:
-   ${
-     isLastQuestion
-       ? 'Thank the student warmly, summarize how valuable their contribution is, and inform them that their ₦500 reward has been approved and unlocked!'
-       : `Seamlessly bridge into the NEXT research question: "${questions[currentQuestionIndex + 1]?.title}"`
-   }
+CRITICAL DYNAMIC CONVERSATIONAL LOGIC:
+1. Carefully analyze what the student just answered:
+   - CASE A (Do NOT advance): Did the student ask a clarification question (e.g., "What do you mean?", "Who are the administrative bodies?"), give an evasive or 1-word answer (e.g., "nothing", "idk", "fine"), give a contradictory answer, or seem confused?
+     -> You MUST set "shouldAdvance": false.
+     -> Answer their question directly, clarify what you mean with friendly Nigerian student context, and gently ask them to share a specific experience on the CURRENT question.
+   - CASE B (Advance): Did the student provide a substantive, relevant answer to the current question?
+     -> You MUST set "shouldAdvance": true.
+     -> Acknowledge their perspective with warm Nigerian empathy (e.g., "I hear you", "That is such an important point", "That must be challenging").
+     ${
+       isLastQuestion
+         ? '-> Conclude warmly: thank them for completing the interview and let them know their ₦500 reward has been approved and credited to their wallet!'
+         : `-> Naturally and smoothly transition into the NEXT question: "${questions[currentQuestionIndex + 1]?.title}"`
+     }
 
-Return your output STRICTLY as valid JSON:
+Return your output STRICTLY as valid raw JSON:
 {
-  "aiReply": "Your conversational response",
-  "shouldAdvance": ${isLastQuestion ? "true" : "true"},
+  "aiReply": "Your conversational reply here",
+  "shouldAdvance": false or true,
   "extractedInsight": "1-sentence summary of what was learned from their response"
 }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
-    const cleanJson = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(cleanJson);
+    const parsed = extractJson<{ aiReply: string; shouldAdvance: boolean; extractedInsight?: string }>(text);
+    const shouldAdvance = Boolean(parsed.shouldAdvance);
 
     return {
       aiReply: parsed.aiReply,
-      nextQuestionIndex: parsed.shouldAdvance ? currentQuestionIndex + 1 : currentQuestionIndex,
-      isFinished: isLastQuestion && parsed.shouldAdvance,
+      nextQuestionIndex: shouldAdvance ? currentQuestionIndex + 1 : currentQuestionIndex,
+      isFinished: isLastQuestion && shouldAdvance,
       extractedInsight: parsed.extractedInsight,
     };
   } catch (err) {
+    console.warn("Conversational step failed, using fallback", err);
+    handleGeminiError(err);
     return getFallbackConversationalStep(surveyTitle, questions, userMessage, currentQuestionIndex);
   }
 };
@@ -544,7 +573,81 @@ function getFallbackSurvey(
   topic: string,
   clarifications: Record<string, string>
 ): GeneratedSurvey {
-  const cleanTopic = topic.trim() || "Student Welfare & Campus Economics";
+  const cleanTopic = topic.trim() || "Student Welfare & Institutional Experience";
+  const lower = cleanTopic.toLowerCase();
+
+  const isGovernanceOrAdmin = /admin|bias|opinion|management|senate|council|vc|rector|lecturer|strike|policy|governance|union|sug/i.test(lower);
+  const isFinanceOrEconomy = /fuel|subsidy|transport|inflation|budget|money|cost|price|fintech|bank|allowance|food/i.test(lower);
+
+  if (isGovernanceOrAdmin) {
+    return {
+      title: `Student Perspectives & Administrative Efficacy in Higher Institutions`,
+      description: `An academic study investigating student perceptions, institutional transparency, and administrative responsiveness across Nigerian tertiary institutions.`,
+      estimated_time: 4,
+      recommended_reward: 500,
+      questions: [
+        {
+          id: "q1",
+          type: "multiple",
+          title: "Which higher institution or geopolitical zone are you currently studying in?",
+          required: true,
+          options: [
+            "Federal Universities (e.g. UNILAG, UI, OAU, UNN, ABU)",
+            "State Universities (e.g. LASU, LAUTECH, DELSU, OOU)",
+            "Private Universities (e.g. Covenant, Babcock, Bowen)",
+            "Polytechnics & Specialized Colleges",
+          ],
+          rationale: "Establishes institutional governance tier baseline.",
+          dataExtracted: "Institutional Tier Classification",
+        },
+        {
+          id: "q2",
+          type: "multiple",
+          title: "How responsive is your university administration when students lodge official complaints or academic grievances?",
+          required: true,
+          options: [
+            "Highly responsive: Resolved promptly and transparently",
+            "Slow but functional: Requires repetitive physical follow-ups",
+            "Unresponsive: Grievances are frequently ignored or delayed for months",
+            "Fear of victimization: Students avoid reporting issues altogether",
+          ],
+          rationale: "Evaluates institutional accountability and administrative efficiency.",
+          dataExtracted: "Administrative Responsiveness Index",
+        },
+        {
+          id: "q3",
+          type: "rating",
+          title: "On a scale of 1 to 5, how fairly and objectively do you feel institutional rules are enforced on campus?",
+          required: true,
+          rationale: "Quantifies perceived systemic bias versus institutional impartiality.",
+          dataExtracted: "Institutional Impartiality Score (1-5)",
+        },
+        {
+          id: "q4",
+          type: "checkbox",
+          title: "Which administrative offices or processes suffer the most bottlenecks on your campus?",
+          required: true,
+          options: [
+            "Result computation & transcript processing (Exams & Records)",
+            "Course registration & student portal network server crashes",
+            "Hostel room allocation & student welfare clearance",
+            "Disciplinary hearings & Student Union Government (SUG) interference",
+          ],
+          rationale: "Identifies systemic administrative friction hotspots.",
+          dataExtracted: "Administrative Friction Distribution",
+        },
+        {
+          id: "q5",
+          type: "long",
+          title: "Describe a specific incident where you or a fellow student had to resolve an urgent administrative issue with faculty officials or university management. What happened?",
+          description: "Provide genuine personal details. Gemini analyzes narrative responses for qualitative whitepaper drafting.",
+          required: true,
+          rationale: "Captures qualitative empirical narratives of student experiences with campus authorities.",
+          dataExtracted: "Qualitative Case Studies on Administration",
+        },
+      ],
+    };
+  }
 
   return {
     title: `Socio-Economic Assessment: ${cleanTopic}`,

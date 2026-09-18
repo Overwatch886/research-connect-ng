@@ -108,9 +108,12 @@ const CreateSurvey = () => {
   const [activeQuestion, setActiveQuestion] = useState<string | null>("1");
   const [showAiModal, setShowAiModal] = useState(false);
   const [showFundingModal, setShowFundingModal] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [fundingMode, setFundingMode] = useState<"paid" | "karma">("paid");
+  const userCredits = Number(localStorage.getItem("research_connect_peer_credits") || "12");
 
-  const totalEscrow = rewardAmount * targetResponses;
+  const studentRewardPool = rewardAmount * targetResponses;
+  const platformFee = Math.round(studentRewardPool * 0.10);
+  const totalEscrow = fundingMode === "paid" ? studentRewardPool + platformFee : 0;
 
   const addQuestion = (type: QuestionType) => {
     const newQuestion: Question = {
@@ -216,10 +219,12 @@ const CreateSurvey = () => {
     setIsPublishing(true);
 
     try {
+      const isKarma = fundingMode === "karma";
       const surveyData = {
         title,
         description,
-        reward_amount: rewardAmount,
+        reward_amount: isKarma ? 0 : rewardAmount,
+        is_peer_exchange: isKarma,
         estimated_time: estimatedTime,
         max_responses: targetResponses,
         current_responses: 0,
@@ -247,10 +252,18 @@ const CreateSurvey = () => {
       });
       localStorage.setItem("research_connect_custom_surveys", JSON.stringify(localSurveys));
 
-      toast({
-        title: "🎉 Survey Published & Funded!",
-        description: `₦${totalEscrow.toLocaleString()} locked in escrow. Now live for Nigerian students.`,
-      });
+      if (isKarma) {
+        localStorage.setItem("research_connect_peer_credits", Math.max(0, userCredits - targetResponses).toString());
+        toast({
+          title: "🎉 Free Survey Published!",
+          description: `${targetResponses} Peer Credits redeemed. Live for Nigerian community peer exchange.`,
+        });
+      } else {
+        toast({
+          title: "🎉 Survey Published & Funded!",
+          description: `₦${totalEscrow.toLocaleString()} locked in escrow (incl. 10% platform fee). Live for Nigerian students.`,
+        });
+      }
 
       setShowFundingModal(false);
       navigate("/dashboard");
@@ -499,57 +512,132 @@ const CreateSurvey = () => {
         <aside className="w-full lg:w-80 p-6 border-t lg:border-t-0 lg:border-l border-border bg-card space-y-6">
           {/* Escrow Budget Configuration */}
           <div className="p-4 rounded-xl border bg-muted/40 space-y-3">
-            <div className="flex items-center gap-2">
-              <Coins className="w-4 h-4 text-emerald-600" />
-              <h3 className="font-semibold text-sm">Reward & Escrow Budget</h3>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-xs">Reward Per Student (₦)</Label>
-              <Input
-                type="number"
-                min={200}
-                step={50}
-                value={rewardAmount}
-                onChange={(e) => setRewardAmount(Number(e.target.value) || 200)}
-                className="text-sm font-semibold"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs">Target Respondents</Label>
-              <Input
-                type="number"
-                min={5}
-                step={5}
-                value={targetResponses}
-                onChange={(e) => setTargetResponses(Number(e.target.value) || 10)}
-                className="text-sm font-semibold"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs">Target University</Label>
-              <select
-                value={selectedUniversity}
-                onChange={(e) => setSelectedUniversity(e.target.value)}
-                className="w-full text-xs p-2 rounded-md border bg-background"
-              >
-                {NIGERIAN_UNIVERSITIES.map((uni) => (
-                  <option key={uni} value={uni}>{uni}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs">
-              <div className="flex justify-between items-center font-bold text-emerald-900 dark:text-emerald-200">
-                <span>Total Escrow:</span>
-                <span className="text-sm">₦{totalEscrow.toLocaleString()}</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Coins className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-semibold text-sm">Funding & Budget</h3>
               </div>
-              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
-                Held in escrow until Gemini verifies genuine student submissions.
-              </p>
+              <Badge variant="outline" className="text-[10px]">
+                {fundingMode === "paid" ? "Escrow" : "Karma Exchange"}
+              </Badge>
             </div>
+
+            {/* Funding Mode Switcher */}
+            <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-lg text-xs">
+              <button
+                type="button"
+                onClick={() => setFundingMode("paid")}
+                className={`py-1.5 px-2 rounded-md font-semibold transition-all ${
+                  fundingMode === "paid"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                💰 Paid Escrow
+              </button>
+              <button
+                type="button"
+                onClick={() => setFundingMode("karma")}
+                className={`py-1.5 px-2 rounded-md font-semibold transition-all ${
+                  fundingMode === "karma"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                🤝 Free (Karma)
+              </button>
+            </div>
+
+            {fundingMode === "paid" ? (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs">Reward Per Student (₦)</Label>
+                  <Input
+                    type="number"
+                    min={200}
+                    step={50}
+                    value={rewardAmount}
+                    onChange={(e) => setRewardAmount(Number(e.target.value) || 200)}
+                    className="text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Target Respondents</Label>
+                  <Input
+                    type="number"
+                    min={5}
+                    step={5}
+                    value={targetResponses}
+                    onChange={(e) => setTargetResponses(Number(e.target.value) || 10)}
+                    className="text-sm font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Target University</Label>
+                  <select
+                    value={selectedUniversity}
+                    onChange={(e) => setSelectedUniversity(e.target.value)}
+                    className="w-full text-xs p-2 rounded-md border bg-background"
+                  >
+                    {NIGERIAN_UNIVERSITIES.map((uni) => (
+                      <option key={uni} value={uni}>{uni}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs space-y-1.5">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Student Incentive Pool:</span>
+                    <span className="font-medium text-foreground">₦{studentRewardPool.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Platform Fee (10%):</span>
+                    <span className="font-medium text-foreground">₦{platformFee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center font-bold text-emerald-900 dark:text-emerald-200 pt-1.5 border-t border-emerald-200 dark:border-emerald-800">
+                    <span>Total Escrow Deposit:</span>
+                    <span className="text-sm text-emerald-600">₦{totalEscrow.toLocaleString()}</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-400 pt-0.5">
+                    100% held in escrow until Gemini verifies genuine student submissions.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs">Target Free Respondents</Label>
+                  <Input
+                    type="number"
+                    min={5}
+                    max={userCredits || 50}
+                    step={1}
+                    value={targetResponses}
+                    onChange={(e) => setTargetResponses(Number(e.target.value) || 5)}
+                    className="text-sm font-semibold"
+                  />
+                  <span className="text-[11px] text-muted-foreground block">
+                    1 Peer Credit = 1 Free verified respondent.
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Your Peer Credits:</span>
+                    <Badge className="bg-purple-600 text-white text-[11px]">{userCredits} Credits Available</Badge>
+                  </div>
+                  <div className="flex justify-between items-center font-semibold text-purple-900 dark:text-purple-200 pt-1 border-t border-purple-200 dark:border-purple-800">
+                    <span>Cash Cost:</span>
+                    <span className="text-emerald-600 font-bold">₦0 (Free Exchange)</span>
+                  </div>
+                  <p className="text-[10px] text-purple-700 dark:text-purple-300">
+                    Earn more credits anytime by completing peer academic surveys in the student feed.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Question Types Palette */}
@@ -585,9 +673,13 @@ const CreateSurvey = () => {
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center mb-2">
               <Coins className="w-5 h-5" />
             </div>
-            <DialogTitle>Fund Escrow & Launch Survey</DialogTitle>
+            <DialogTitle>
+              {fundingMode === "paid" ? "Fund Escrow & Launch Survey" : "Redeem Peer Karma & Launch Free Survey"}
+            </DialogTitle>
             <DialogDescription>
-              Guaranteed financial rewards protect your research integrity and incentivize high-quality student responses.
+              {fundingMode === "paid"
+                ? "Guaranteed financial rewards protect research integrity and incentivize high-quality student responses."
+                : "Spend your earned Peer Research Karma to gather verified student responses with zero cash required."}
             </DialogDescription>
           </DialogHeader>
 
@@ -597,24 +689,56 @@ const CreateSurvey = () => {
                 <span className="text-muted-foreground">Survey Title:</span>
                 <span className="font-semibold text-right max-w-[240px] truncate">{title || "Untitled"}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Reward / Respondent:</span>
-                <span className="font-semibold">₦{rewardAmount.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Target Sample Size:</span>
-                <span className="font-semibold">{targetResponses} students</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t font-bold text-base text-foreground">
-                <span>Total Escrow Deposit:</span>
-                <span className="text-emerald-600">₦{totalEscrow.toLocaleString()}</span>
-              </div>
+
+              {fundingMode === "paid" ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Reward / Respondent:</span>
+                    <span className="font-semibold">₦{rewardAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Target Sample Size:</span>
+                    <span className="font-semibold">{targetResponses} students</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Student Reward Pool:</span>
+                    <span className="font-semibold">₦{studentRewardPool.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Platform Fee (10%):</span>
+                    <span className="font-semibold">₦{platformFee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t font-bold text-base text-foreground">
+                    <span>Total Escrow Deposit:</span>
+                    <span className="text-emerald-600">₦{totalEscrow.toLocaleString()}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Funding Model:</span>
+                    <span className="font-semibold text-purple-600">Peer Research Karma</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Target Sample Size:</span>
+                    <span className="font-semibold">{targetResponses} respondents</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Karma Credits to Deduct:</span>
+                    <span className="font-semibold text-amber-600">{targetResponses} Credits</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t font-bold text-base text-foreground">
+                    <span>Total Cash Required:</span>
+                    <span className="text-emerald-600">₦0 (Free)</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
               <span>
-                Funds are held in secure escrow. Gemini AI will automatically audit responses to disqualify spam or bot entries before paying out students.
+                Gemini AI will automatically audit student responses to disqualify off-topic banter and spam before approving submissions.
               </span>
             </div>
           </div>
@@ -631,12 +755,17 @@ const CreateSurvey = () => {
               {isPublishing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Funding Escrow...</span>
+                  <span>Publishing Survey...</span>
+                </>
+              ) : fundingMode === "paid" ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Authorize ₦{totalEscrow.toLocaleString()} & Publish</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Authorize ₦{totalEscrow.toLocaleString()} & Publish</span>
+                  <span>Redeem {targetResponses} Credits & Publish</span>
                 </>
               )}
             </Button>

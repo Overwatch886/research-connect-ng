@@ -153,7 +153,21 @@ export const TakeSurvey = () => {
       // Default fallback survey
       setSurvey(SEED_SURVEYS["1"]);
     }
+
+    // Restore any saved in-progress draft answers
+    const draft = localStorage.getItem(`survey_draft_${id}`);
+    if (draft) {
+      try {
+        setAnswers(JSON.parse(draft));
+      } catch (e) {}
+    }
   }, [id]);
+
+  useEffect(() => {
+    if (id && Object.keys(answers).length > 0) {
+      localStorage.setItem(`survey_draft_${id}`, JSON.stringify(answers));
+    }
+  }, [id, answers]);
 
   const handleTextChange = (questionId: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -235,6 +249,7 @@ export const TakeSurvey = () => {
         completed_at: new Date().toISOString(),
       });
       localStorage.setItem("research_connect_recorded_responses", JSON.stringify(allResponses));
+      localStorage.removeItem(`survey_draft_${survey.id}`);
 
       setIsSubmitted(true);
       toast({

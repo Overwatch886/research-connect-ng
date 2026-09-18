@@ -58,6 +58,7 @@ const Navbar = () => {
   const landingLinks = [
     { name: "How It Works", href: "/#how-it-works" },
     { name: "Pricing", href: "/pricing" },
+    { name: "Demo", href: "/demo" },
     { name: "For Researchers", href: "/dashboard" },
     { name: "For Students", href: "/surveys" },
   ];

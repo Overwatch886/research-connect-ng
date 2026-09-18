@@ -235,7 +235,7 @@ const Dashboard = () => {
                   🔬 Academic Research Studio
                 </span>
                 <span className="text-xs text-indigo-200 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-300" /> Powered by Gemini 1.5 Flash
+                  <Sparkles className="w-3 h-3 text-amber-300" /> Powered by Gemini 2.0 Flash
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-white">
@@ -252,9 +252,9 @@ const Dashboard = () => {
                   Launch New Survey
                 </Link>
               </Button>
-              <Button size="sm" variant="outline" className="text-xs border-indigo-400/40 text-white hover:bg-indigo-800/60" asChild>
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs border-0 shadow gap-1.5" asChild>
                 <Link to="/surveys">
-                  <GraduationCap className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                  <GraduationCap className="w-4 h-4 text-white" />
                   Switch to Student View
                 </Link>
               </Button>

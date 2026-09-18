@@ -55,8 +55,13 @@ export const SurveyCard = ({ survey, onStart, isStarting, hasStarted }: SurveyCa
       
       <CardFooter>
         {hasStarted ? (
-          <Button variant="outline" className="w-full" disabled>
-            Already Started
+          <Button 
+            className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white font-medium"
+            onClick={() => onStart(survey.id)}
+            disabled={isStarting}
+          >
+            {isStarting ? "Resuming..." : "Continue Survey"}
+            <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
           <Button 

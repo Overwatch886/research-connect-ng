@@ -130,7 +130,7 @@ export const AiSurveyArchitectModal = ({
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <DialogTitle className="text-lg">Gemini AI Survey Architect</DialogTitle>
+              <DialogTitle className="text-lg">Gemini 2.0 AI Survey Architect</DialogTitle>
               <DialogDescription className="text-xs">
                 Consultative AI that calibrates your research questions for Nigerian demographics.
               </DialogDescription>
@@ -180,7 +180,7 @@ export const AiSurveyArchitectModal = ({
               {loading ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
                   <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                  <p className="text-sm font-medium">Gemini is formulating clarification questions...</p>
+                  <p className="text-sm font-medium">Gemini 2.0 Flash is formulating clarification questions...</p>
                   <p className="text-xs text-muted-foreground">Calibrating academic & demographic nuances</p>
                 </div>
               ) : (
