@@ -119,6 +119,7 @@ export interface ChatMessage {
   sender: "ai" | "user";
   text: string;
   timestamp: string;
+  badge?: string;
 }
 
 export interface ConversationalStepResult {
@@ -126,6 +127,7 @@ export interface ConversationalStepResult {
   nextQuestionIndex: number;
   isFinished: boolean;
   extractedInsight?: string;
+  isClarifying?: boolean;
 }
 
 // 1. Clarification Interview Generator
@@ -254,45 +256,75 @@ export const conductConversationalStep = async (
       .map((h) => `${h.sender === "user" ? "Student" : "Interviewer"}: ${h.text}`)
       .join("\n");
 
-    const prompt = `You are "Ada", an empathetic, intelligent Nigerian academic field researcher conducting an interactive conversational survey for the study: "${surveyTitle}".
-Current Question to investigate: "${currentQ?.title || "Final thoughts"}"
-Target Research Objective: "${currentQ?.rationale || "Student context"}"
+    const prompt = `You are "Ada", an empathetic, highly skilled Nigerian academic field researcher conducting an interactive conversational survey for the study: "${surveyTitle}".
 
-Recent conversation:
+Current Question to investigate:
+"${currentQ?.title || "Final thoughts"}"
+
+Target Research Objective:
+"${currentQ?.rationale || "Student context"}"
+
+Recent conversation history:
 ${formattedHistory}
-Latest student answer: "${userMessage}"
 
-CRITICAL DYNAMIC CONVERSATIONAL LOGIC:
-1. Carefully analyze what the student just answered:
-   - CASE A (Do NOT advance): Did the student ask a clarification question (e.g., "What do you mean?", "Who are the administrative bodies?"), give an evasive or 1-word answer (e.g., "nothing", "idk", "fine"), give a contradictory answer, or seem confused?
-     -> You MUST set "shouldAdvance": false.
-     -> Answer their question directly, clarify what you mean with friendly Nigerian student context, and gently ask them to share a specific experience on the CURRENT question.
-   - CASE B (Advance): Did the student provide a substantive, relevant answer to the current question?
-     -> You MUST set "shouldAdvance": true.
-     -> Acknowledge their perspective with warm Nigerian empathy (e.g., "I hear you", "That is such an important point", "That must be challenging").
-     ${
-       isLastQuestion
-         ? '-> Conclude warmly: thank them for completing the interview and let them know their ₦500 reward has been approved and credited to their wallet!'
-         : `-> Naturally and smoothly transition into the NEXT question: "${questions[currentQuestionIndex + 1]?.title}"`
-     }
+Latest student reply:
+"${userMessage}"
 
-Return your output STRICTLY as valid raw JSON:
+EVALUATION PROTOCOL:
+Step 1: Classify the student's message into ONE of four intent categories:
+1. "question_clarification": The student asks what a term means (e.g., "What does administrative bodies mean?", "Who are you asking about?"), asks for clarification, expresses confusion, or asks a question.
+2. "evasive_or_non_answer": The student gives an evasive, non-informative, dismissive, or 1-word non-answer (e.g., "nothing", "idk", "i don't know", "fine", "cool", "okay", "no idea", "none", "skip", "whatever", "not really").
+3. "off_topic": The student talks about something completely unrelated to the research study (e.g. Premier League football, movies, music, random banter, greetings without content like "hello how are you").
+4. "substantive_valid_answer": The student provides a genuine, meaningful answer, personal experience, opinion, or factual response that directly addresses the current question.
+
+Step 2: Act strictly according to the intent:
+- IF "question_clarification":
+  - "shouldAdvance" MUST BE false.
+  - In "aiReply": Answer their question directly and warmly using authentic Nigerian campus context (e.g., explain that administrative bodies include the Dean of Student Affairs/DSA, Exams and Records, Faculty/Departmental officers, Bursary, or Portal Admin). Then gently ask them to share their own experience or encounter with that office on the CURRENT question.
+- IF "evasive_or_non_answer":
+  - "shouldAdvance" MUST BE false.
+  - In "aiReply": Empathize warmly in friendly Nigerian student tone (e.g., "No wahala at all! Even if nothing major happened...", "Take your time!"). Provide an accessible, relatable campus example and prompt them with a simple follow-up question on the CURRENT topic.
+- IF "off_topic":
+  - "shouldAdvance" MUST BE false.
+  - In "aiReply": Acknowledge humorously or politely, but gently refocus them on the survey topic and ask for their experience on the CURRENT question.
+- IF "substantive_valid_answer":
+  - "shouldAdvance" MUST BE true.
+  - In "aiReply": Acknowledge their response with warmth and empathy (e.g., "That is such an important point", "Navigating that kind of delay takes serious patience").
+  ${
+    isLastQuestion
+      ? '-> Conclude warmly: thank them enthusiastically for completing the interview and confirm their ₦500 reward has been approved and credited to their student wallet!'
+      : `-> Smoothly and naturally transition into the NEXT question: "${questions[currentQuestionIndex + 1]?.title}"`
+  }
+
+STRICT RAW JSON OUTPUT (no markdown backticks, just valid JSON):
 {
-  "aiReply": "Your conversational reply here",
+  "userIntent": "question_clarification" | "evasive_or_non_answer" | "off_topic" | "substantive_valid_answer",
+  "evaluationRationale": "1 sentence explaining why this message does or does not answer the question",
   "shouldAdvance": false or true,
-  "extractedInsight": "1-sentence summary of what was learned from their response"
+  "aiReply": "Ada's conversational reply",
+  "extractedInsight": "1-sentence summary of what was learned or why probed"
 }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
-    const parsed = extractJson<{ aiReply: string; shouldAdvance: boolean; extractedInsight?: string }>(text);
-    const shouldAdvance = Boolean(parsed.shouldAdvance);
+    const parsed = extractJson<{ 
+      userIntent?: string;
+      evaluationRationale?: string;
+      aiReply: string; 
+      shouldAdvance: boolean; 
+      extractedInsight?: string 
+    }>(text);
+
+    // Hard gate: only advance if userIntent is substantive_valid_answer AND shouldAdvance is true
+    const isSubstantive = parsed.userIntent === "substantive_valid_answer";
+    const shouldAdvance = Boolean(parsed.shouldAdvance) && isSubstantive;
 
     return {
       aiReply: parsed.aiReply,
       nextQuestionIndex: shouldAdvance ? currentQuestionIndex + 1 : currentQuestionIndex,
       isFinished: isLastQuestion && shouldAdvance,
-      extractedInsight: parsed.extractedInsight,
+      extractedInsight: parsed.extractedInsight || parsed.evaluationRationale,
+      isClarifying: !shouldAdvance,
     };
   } catch (err) {
     console.warn("Conversational step failed, using fallback", err);
@@ -724,44 +756,109 @@ function getFallbackConversationalStep(
   userMessage: string,
   currentQuestionIndex: number
 ): ConversationalStepResult {
-  const words = userMessage.trim().split(/\s+/).filter(Boolean);
+  const trimmed = userMessage.trim();
+  const lower = trimmed.toLowerCase();
+  const words = lower.split(/\s+/).filter(Boolean);
   const currentQ = questions[currentQuestionIndex];
+  const qTitleLower = (currentQ?.title || "").toLowerCase();
 
-  // If answer is too brief or evasive, gently probe before advancing
-  if (words.length < 3) {
+  // 1. Check for Question / Clarification Request
+  const isQuestion = 
+    trimmed.endsWith("?") ||
+    /^(what|who|which|how|why|where|can you|could you|explain|meaning|clarify)\b/i.test(trimmed) ||
+    /what do you mean|who are|who is|i don'?t understand|what is|meaning of/i.test(lower);
+
+  if (isQuestion) {
+    let explanation = "By this, we're looking at your direct personal experience on campus.";
+    if (/admin|body|bodies|management|governance|authority/i.test(qTitleLower) || /admin/i.test(lower)) {
+      explanation = "By 'administrative bodies', we mean campus offices like your Dean of Student Affairs (DSA), Exams and Records, your Departmental or Faculty Officers, the Bursary, or the Student Portal managers.";
+    } else if (/budget|money|fintech|bank|cost|allowance|food/i.test(qTitleLower)) {
+      explanation = "We're exploring how everyday costs—like food, transport fares, course handouts, or phone data—affect your weekly allowance and personal budget.";
+    } else if (/power|light|electricity|generator/i.test(qTitleLower)) {
+      explanation = "We're looking at how campus power cuts and lodge blackout hours disrupt your studying, phone/laptop charging, and semester preparations.";
+    }
+
     return {
-      aiReply: `I hear you, but could you tell me a little more specifically about that? For example, how does this affect you personally regarding: "${currentQ?.title}"?`,
+      aiReply: `${explanation} Have you personally had any encounters or challenges with this recently? Even a small experience or opinion would be really helpful!`,
       nextQuestionIndex: currentQuestionIndex,
       isFinished: false,
-      extractedInsight: "Probing for more specific student context.",
+      extractedInsight: "Provided contextual clarification on question concept.",
+      isClarifying: true,
     };
   }
 
-  const isLast = currentQuestionIndex >= questions.length - 1;
+  // 2. Check for Greetings or pleasantries with no substance
+  if (/^(hello|hi|hey|good morning|good afternoon|good evening|yo|sup|what'?s up)$/i.test(trimmed)) {
+    return {
+      aiReply: `Hello! 👋 Great to have you here. To help with our study, could you tell me your thoughts on: "${currentQ?.title}"?`,
+      nextQuestionIndex: currentQuestionIndex,
+      isFinished: false,
+      extractedInsight: "Refocused student following greeting.",
+      isClarifying: true,
+    };
+  }
 
+  // 3. Check for Evasive, 1-Word, or Non-Answers
+  const evasiveRegex = /^(nothing|none|nil|n\/a|na|not applicable|i don'?t know|no idea|idk|nothing much|no comment|good|bad|fine|okay|ok|cool|skip|next|whatever|i don'?t care|can'?t say|haven'?t seen|not sure|not really|nothing really|nope|nah|yes|no)$/i;
+  const isEvasive = evasiveRegex.test(trimmed) || words.length < 4;
+
+  if (isEvasive) {
+    let probeContext = "even small daily routines count!";
+    if (/admin/i.test(qTitleLower)) {
+      probeContext = "for example, have you had to queue at Exams & Records, fix an issue with course registration, or deal with hostel clearance?";
+    } else if (/budget|money|fintech/i.test(qTitleLower)) {
+      probeContext = "like whether transport fares or food prices have made you cut back on something this week?";
+    } else if (/power|electric/i.test(qTitleLower)) {
+      probeContext = "like how you manage to charge your phone or study when there is a blackout?";
+    }
+
+    return {
+      aiReply: `No wahala at all! Take your time—${probeContext} How has that been for you personally?`,
+      nextQuestionIndex: currentQuestionIndex,
+      isFinished: false,
+      extractedInsight: "Probed for substantive personal student experience.",
+      isClarifying: true,
+    };
+  }
+
+  // 4. Check for Explicitly Off-Topic chatter (sports, betting, crypto, gaming)
+  const offTopicTerms = ["arsenal", "chelsea", "man united", "real madrid", "ronaldo", "messi", "sportybet", "bet9ja", "crypto", "bitcoin", "fifa"];
+  if (words.some((w) => offTopicTerms.includes(w))) {
+    return {
+      aiReply: `Haha, I hear you! But for this study, we really need your student perspective on: "${currentQ?.title}". What has your experience been?`,
+      nextQuestionIndex: currentQuestionIndex,
+      isFinished: false,
+      extractedInsight: "Redirected from off-topic discussion.",
+      isClarifying: true,
+    };
+  }
+
+  // 5. Valid Substantive Answer: Advance!
+  const isLast = currentQuestionIndex >= questions.length - 1;
   if (isLast) {
     return {
-      aiReply: `Thank you so much for sharing that personal experience! That is deeply insightful for our study on "${surveyTitle}". Your response has been validated, and your ₦500 reward has just been credited to your student wallet. You did great!`,
+      aiReply: `Thank you so much for sharing that! That is genuine, authentic data that will really help our research on "${surveyTitle}". Your response has been verified and validated by our AI quality check, and your ₦500 reward has just been credited to your student wallet! 🎓`,
       nextQuestionIndex: currentQuestionIndex + 1,
       isFinished: true,
-      extractedInsight: "Student highlighted acute budget trade-offs and daily survival strategies.",
+      extractedInsight: "Student provided comprehensive qualitative perspective.",
+      isClarifying: false,
     };
   }
 
   const nextQ = questions[currentQuestionIndex + 1];
-  const responses = [
-    `I really appreciate you sharing that honestly—it's a reality that so many Nigerian students are facing right now. Moving to the next point: ${nextQ?.title}`,
-    `That is such an important detail. It really highlights how these challenges ripple through daily life. Let me ask you: ${nextQ?.title}`,
-    `I hear you loud and clear. It takes serious resilience to navigate that. To build on this: ${nextQ?.title}`,
+  const transitions = [
+    `That is such an important point. It really captures the day-to-day reality of Nigerian students right now. Moving to our next question: "${nextQ?.title}"`,
+    `I hear you loud and clear. That takes serious resilience to deal with. To explore this a bit further: "${nextQ?.title}"`,
+    `Thank you for being so honest about that—this is exactly the type of empirical insight researchers need. Let's move to: "${nextQ?.title}"`,
   ];
-
-  const chosenReply = responses[currentQuestionIndex % responses.length];
+  const chosenReply = transitions[currentQuestionIndex % transitions.length];
 
   return {
     aiReply: chosenReply,
     nextQuestionIndex: currentQuestionIndex + 1,
     isFinished: false,
-    extractedInsight: `Respondent shared personal perspective on question ${currentQuestionIndex + 1}.`,
+    extractedInsight: `Recorded student perspective for question ${currentQuestionIndex + 1}.`,
+    isClarifying: false,
   };
 }
 

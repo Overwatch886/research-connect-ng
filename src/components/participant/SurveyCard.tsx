@@ -10,9 +10,20 @@ interface SurveyCardProps {
   isStarting: boolean;
   hasStarted?: boolean;
   hasCompleted?: boolean;
+  matchInfo?: {
+    isMatch: boolean;
+    matchReason: string;
+  };
 }
 
-export const SurveyCard = ({ survey, onStart, isStarting, hasStarted, hasCompleted }: SurveyCardProps) => {
+export const SurveyCard = ({ 
+  survey, 
+  onStart, 
+  isStarting, 
+  hasStarted, 
+  hasCompleted,
+  matchInfo 
+}: SurveyCardProps) => {
   const spotsRemaining = survey.max_responses 
     ? survey.max_responses - survey.current_responses 
     : null;
@@ -21,9 +32,22 @@ export const SurveyCard = ({ survey, onStart, isStarting, hasStarted, hasComplet
     <Card className={`hover:shadow-lg transition-shadow ${hasCompleted ? "border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/10" : ""}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+          <div className="space-y-1.5 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-lg">{survey.title}</CardTitle>
+              {matchInfo && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-[10px] font-semibold py-0.5 px-2 flex items-center gap-1 shrink-0 ${
+                    matchInfo.isMatch
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300"
+                      : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                  }`}
+                >
+                  <span>🎯</span>
+                  <span>{matchInfo.matchReason}</span>
+                </Badge>
+              )}
             </div>
             <CardDescription className="line-clamp-2">
               {survey.description || "No description provided"}
@@ -35,7 +59,7 @@ export const SurveyCard = ({ survey, onStart, isStarting, hasStarted, hasComplet
             </Badge>
             {hasCompleted && (
               <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-semibold flex items-center gap-0.5">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Completed
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Submitted
               </Badge>
             )}
           </div>
@@ -67,12 +91,11 @@ export const SurveyCard = ({ survey, onStart, isStarting, hasStarted, hasComplet
         {hasCompleted ? (
           <Button 
             variant="outline"
-            className="w-full gap-2 border-emerald-300 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/80 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 font-medium"
-            onClick={() => onStart(survey.id)}
-            disabled={isStarting}
+            className="w-full gap-2 border-emerald-300 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 font-medium cursor-default opacity-85"
+            disabled={true}
           >
             <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <span>{isStarting ? "Opening..." : "Completed • Review / Retake"}</span>
+            <span>✓ Response Submitted</span>
           </Button>
         ) : hasStarted ? (
           <Button 

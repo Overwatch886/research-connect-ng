@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { AiInsightsModal } from "@/components/AiInsightsModal";
+import { ExtendQuotaModal } from "@/components/ExtendQuotaModal";
 
 // Mock data for demonstration
 const mockSurveys = [
@@ -70,6 +71,14 @@ const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const [surveyToExtend, setSurveyToExtend] = useState<{
+    id: string;
+    title: string;
+    responses: number;
+    target: number;
+    rewardAmount?: number;
+  } | null>(null);
+
   const [surveyStatuses, setSurveyStatuses] = useState<Record<string, "active" | "closed">>(() => {
     try {
       return JSON.parse(localStorage.getItem("research_connect_survey_statuses") || "{}");
@@ -85,6 +94,7 @@ const Dashboard = () => {
           title: s.title,
           responses: s.current_responses || 0,
           target: s.max_responses || 50,
+          rewardAmount: s.reward_amount || 500,
           status: s.status || "active",
           createdAt: s.created_at ? s.created_at.split("T")[0] : "Today"
         }))
@@ -106,7 +116,26 @@ const Dashboard = () => {
     });
   }, [surveyStatuses]);
 
-  const handleToggleSurveyStatus = (surveyId: string, currentStatus: string, surveyTitle: string) => {
+  const handleToggleSurveyStatus = (
+    surveyId: string, 
+    currentStatus: string, 
+    surveyTitle: string,
+    responses?: number,
+    target?: number,
+    rewardAmount?: number
+  ) => {
+    // Escrow Protection: If quota is already filled, researcher must add spots & fund escrow!
+    if (responses !== undefined && target !== undefined && responses >= target) {
+      setSurveyToExtend({
+        id: surveyId,
+        title: surveyTitle,
+        responses,
+        target,
+        rewardAmount: rewardAmount || 500,
+      });
+      return;
+    }
+
     const newStatus = currentStatus === "active" ? "closed" : "active";
 
     const updatedStatuses: Record<string, "active" | "closed"> = { ...surveyStatuses, [surveyId]: newStatus };
@@ -435,17 +464,26 @@ const Dashboard = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title)}
+                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title, survey.responses, survey.target, survey.rewardAmount)}
                         className="text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/50 gap-1 font-medium"
                       >
                         <PauseCircle className="w-3.5 h-3.5" />
                         <span>Close</span>
                       </Button>
+                    ) : survey.status === "completed" || survey.responses >= survey.target ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title, survey.responses, survey.target, survey.rewardAmount)}
+                        className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold shadow-sm"
+                      >
+                        <PlayCircle className="w-3.5 h-3.5" />
+                        <span>Resume & Add Spots</span>
+                      </Button>
                     ) : (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title)}
+                        onClick={() => handleToggleSurveyStatus(survey.id, survey.status, survey.title, survey.responses, survey.target, survey.rewardAmount)}
                         className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 gap-1 font-medium"
                       >
                         <PlayCircle className="w-3.5 h-3.5" />
@@ -473,6 +511,19 @@ const Dashboard = () => {
             onOpenChange={(open) => !open && setSelectedSurveyForInsights(null)}
             surveyTitle={selectedSurveyForInsights.title}
             responseCount={selectedSurveyForInsights.responses}
+          />
+        )}
+
+        {/* Quota Extension & Escrow Top-up Modal */}
+        {surveyToExtend && (
+          <ExtendQuotaModal
+            isOpen={!!surveyToExtend}
+            onClose={() => setSurveyToExtend(null)}
+            survey={surveyToExtend}
+            onSuccess={(surveyId, newTarget) => {
+              setSurveyStatuses((prev) => ({ ...prev, [surveyId]: "active" }));
+              setSurveyToExtend(null);
+            }}
           />
         )}
       </main>

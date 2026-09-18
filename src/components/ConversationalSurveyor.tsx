@@ -151,6 +151,11 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
         sender: "ai",
         text: step.aiReply,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        badge: step.isClarifying 
+          ? "💡 Clarifying / Probing" 
+          : step.isFinished 
+            ? "🎉 Completed & Verified" 
+            : "✓ Response Verified",
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -361,6 +366,17 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
                   : "bg-card border border-border text-foreground rounded-tl-none shadow-sm"
               }`}
             >
+              {msg.badge && (
+                <div className="mb-1.5">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${
+                    msg.badge.includes("Clarifying")
+                      ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800"
+                      : "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800"
+                  }`}>
+                    {msg.badge}
+                  </span>
+                </div>
+              )}
               <p className="whitespace-pre-line">{msg.text}</p>
               <span
                 className={`text-[10px] block mt-1 ${

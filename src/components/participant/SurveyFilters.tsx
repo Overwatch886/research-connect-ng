@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export type SortOption = "newest" | "reward-high" | "reward-low" | "time-short" | "time-long";
-export type FilterOption = "all" | "high-reward" | "quick" | "limited";
+export type FilterOption = "all" | "matched" | "high-reward" | "quick" | "limited";
 
 interface SurveyFiltersProps {
   sortBy: SortOption;
@@ -31,6 +31,7 @@ const sortLabels: Record<SortOption, string> = {
 
 const filterLabels: Record<FilterOption, string> = {
   "all": "All Surveys",
+  "matched": "🎯 Matched For Me",
   "high-reward": "High Reward (₦500+)",
   "quick": "Quick (< 10 min)",
   "limited": "Limited Spots",
@@ -92,6 +93,7 @@ export const SurveyFilters = ({
           <DropdownMenuSeparator />
           <DropdownMenuRadioGroup value={filterBy} onValueChange={(v) => onFilterChange(v as FilterOption)}>
             <DropdownMenuRadioItem value="all">All Surveys</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="matched">🎯 Matched For Me</DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="high-reward">High Reward (₦500+)</DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="quick">Quick (&lt; 10 min)</DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="limited">Limited Spots</DropdownMenuRadioItem>

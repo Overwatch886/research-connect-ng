@@ -21,6 +21,13 @@ import { SurveyFilters, SortOption, FilterOption } from "@/components/participan
 import { EarningsCard } from "@/components/participant/EarningsCard";
 import { RecentActivity } from "@/components/participant/RecentActivity";
 import { WithdrawalModal } from "@/components/participant/WithdrawalModal";
+import { DemographicsModal } from "@/components/participant/DemographicsModal";
+import { 
+  StudentDemographics, 
+  getStudentDemographics, 
+  calculateDemographicMatch, 
+  DemographicMatchResult 
+} from "@/lib/demographics";
 
 const ParticipantDashboard = () => {
   const navigate = useNavigate();
@@ -37,7 +44,9 @@ const ParticipantDashboard = () => {
   const [filterBy, setFilterBy] = useState<FilterOption>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isDemographicsModalOpen, setIsDemographicsModalOpen] = useState(false);
   const [localBalanceOverride, setLocalBalanceOverride] = useState<number | null>(null);
+  const [demographics, setDemographics] = useState<StudentDemographics>(getStudentDemographics());
 
   // Calculate stats from responses and local wallet balance
   const stats = useMemo(() => {
@@ -175,8 +184,17 @@ const ParticipantDashboard = () => {
       );
     }
     
+    // Compute demographic match for each survey
+    const matchMap: Record<string, DemographicMatchResult> = {};
+    result.forEach((s) => {
+      matchMap[s.id] = calculateDemographicMatch(s, demographics);
+    });
+    
     // Apply category filter
     switch (filterBy) {
+      case "matched":
+        result = result.filter(s => matchMap[s.id]?.isMatch);
+        break;
       case "high-reward":
         result = result.filter(s => s.reward_amount >= 500);
         break;
@@ -188,10 +206,14 @@ const ParticipantDashboard = () => {
         break;
     }
     
-    // Apply sorting
+    // Apply sorting: newest also prioritizes direct demographic matches first
     switch (sortBy) {
       case "newest":
-        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        result.sort((a, b) => {
+          const scoreDiff = (matchMap[b.id]?.score || 0) - (matchMap[a.id]?.score || 0);
+          if (scoreDiff !== 0) return scoreDiff;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
         break;
       case "reward-high":
         result.sort((a, b) => b.reward_amount - a.reward_amount);
@@ -208,7 +230,17 @@ const ParticipantDashboard = () => {
     }
     
     return result;
-  }, [surveys, searchQuery, sortBy, filterBy, completedSurveyIds]);
+  }, [surveys, searchQuery, sortBy, filterBy, completedSurveyIds, demographics]);
+
+  const demographicMatchMap = useMemo(() => {
+    const map: Record<string, DemographicMatchResult> = {};
+    if (filteredSurveys) {
+      filteredSurveys.forEach((s: any) => {
+        map[s.id] = calculateDemographicMatch(s, demographics);
+      });
+    }
+    return map;
+  }, [filteredSurveys, demographics]);
 
   const handleStartSurvey = async (surveyId: string) => {
     setStartingSurveyId(surveyId);
@@ -307,6 +339,41 @@ const ParticipantDashboard = () => {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Student Academic & Regional Demographics Bar */}
+        <div className="mb-8 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-indigo-500/10 to-purple-500/10 border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                <span className="font-semibold text-sm text-foreground">
+                  {demographics.university}
+                </span>
+                <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 font-semibold">
+                  {demographics.geopoliticalZone} Zone
+                </Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  {demographics.levelOfStudy} • {demographics.faculty}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                🎯 Matching active: Surveys are filtered and scored to your institutional and regional demographic profile.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsDemographicsModalOpen(true)}
+            className="text-xs gap-1.5 shrink-0 border-emerald-300 hover:bg-emerald-50 text-emerald-800 dark:text-emerald-300 font-semibold shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Update Demographics</span>
+          </Button>
         </div>
 
         {/* Main Grid Layout */}
@@ -409,6 +476,7 @@ const ParticipantDashboard = () => {
                         isStarting={startingSurveyId === survey.id}
                         hasStarted={inProgressSurveyIds.has(survey.id)}
                         hasCompleted={completedSurveyIds.has(survey.id)}
+                        matchInfo={demographicMatchMap[survey.id]}
                       />
                     ))}
                   </div>
@@ -465,6 +533,12 @@ const ParticipantDashboard = () => {
         onWithdrawSuccess={(newBal) => {
           setLocalBalanceOverride(newBal);
         }}
+      />
+
+      <DemographicsModal
+        isOpen={isDemographicsModalOpen}
+        onClose={() => setIsDemographicsModalOpen(false)}
+        onSaved={(updated) => setDemographics(updated)}
       />
 
       <Footer />
