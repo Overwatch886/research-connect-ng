@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Search, AlertCircle, LayoutGrid, List, GraduationCap, Microscope, ShieldCheck, CheckCircle2, Sparkles } from "lucide-react";
+import { Search, AlertCircle, LayoutGrid, List, GraduationCap, Microscope, ShieldCheck, CheckCircle2, Sparkles, ShieldAlert, ArrowRight } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
@@ -281,25 +281,75 @@ const ParticipantDashboard = () => {
     setIsWithdrawModalOpen(true);
   };
 
-  // Redirect if not verified
+  // Prompt if not verified
   if (!profileLoading && profile && !profile.is_verified) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-muted/20">
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <Alert variant="destructive" className="max-w-lg mx-auto">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              You need to verify your student status to access surveys.{" "}
-              <Button 
-                variant="link" 
-                className="p-0 h-auto" 
+        <main className="flex-grow container mx-auto px-4 pt-28 pb-16 flex items-center justify-center">
+          <div className="max-w-xl w-full bg-card rounded-2xl border border-border p-6 sm:p-8 shadow-xl text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto ring-8 ring-amber-500/5">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <Badge variant="outline" className="px-3 py-1 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 text-xs font-semibold uppercase tracking-wider">
+                Student Verification Required
+              </Badge>
+              <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">
+                Verify Your Student Status
+              </h1>
+              <p className="text-muted-foreground text-sm sm:text-base leading-relaxed max-w-md mx-auto">
+                To participate in research demographic studies, earn instant cash rewards, or build peer karma, you must verify your Nigerian tertiary institution affiliation.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-3 text-left p-4 rounded-xl bg-muted/50 border border-border/80 text-xs">
+              <div className="space-y-1">
+                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                  <GraduationCap className="w-4 h-4 text-emerald-600" />
+                  <span>Verified Pool</span>
+                </div>
+                <p className="text-muted-foreground">Access university-targeted campus surveys.</p>
+              </div>
+              <div className="space-y-1">
+                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                  <span>Cash Rewards</span>
+                </div>
+                <p className="text-muted-foreground">Direct payouts into your Nigerian bank account.</p>
+              </div>
+              <div className="space-y-1">
+                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  <span>Peer Karma</span>
+                </div>
+                <p className="text-muted-foreground">Earn credits for your own project surveys.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <Button
                 onClick={() => navigate("/verify-student")}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-2 py-6 px-6 text-sm shadow-md"
               >
-                Verify now
+                <ShieldCheck className="w-4 h-4" />
+                <span>Verify Student Status Now</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
-            </AlertDescription>
-          </Alert>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/demo")}
+                className="py-6 px-5 text-sm"
+              >
+                View Platform Demo
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Verification takes under 2 minutes using your student ID card or official university <code className="text-foreground font-mono">.edu.ng</code> email.
+            </p>
+          </div>
         </main>
         <Footer />
       </div>
@@ -312,7 +362,7 @@ const ParticipantDashboard = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
       
-      <main className="flex-grow container mx-auto px-4 py-8">
+      <main className="flex-grow container mx-auto px-4 pt-24 pb-12">
         {/* Header */}
         <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
