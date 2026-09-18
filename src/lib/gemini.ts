@@ -43,13 +43,13 @@ export const notifyQuotaExhausted = (detail?: string) => {
 };
 
 export const handleGeminiError = (err: any) => {
-  const msg = String(err?.message || err);
-  if (
-    err?.status === 429 ||
+  const msg = String(err?.message || err || "");
+  console.warn("Gemini service notification:", msg);
+  notifyQuotaExhausted(
     /429|resource_exhausted|quota|rate limit|too many requests/i.test(msg)
-  ) {
-    notifyQuotaExhausted("Platform Gemini API rate limit reached.");
-  }
+      ? "Platform Gemini API rate limit reached. Please provide your own free Gemini API key to continue with live AI."
+      : "Platform AI service is unavailable or rate-limited. Please provide your own Gemini API key to continue with live AI, or fallback mode will be used."
+  );
 };
 
 export const getPreferredGeminiModel = (genAI: GoogleGenerativeAI, modelName: string = "gemini-1.5-flash") => {
@@ -146,6 +146,7 @@ async function callGeminiProxy(prompt: string, model: string): Promise<string> {
   let data: any = null;
   let error: any = null;
 
+  // 1. First attempt: standard Supabase SDK functions.invoke
   try {
     const res = await supabase.functions.invoke(GEMINI_EDGE_FUNCTION, {
       body: { prompt, model },
@@ -153,7 +154,30 @@ async function callGeminiProxy(prompt: string, model: string): Promise<string> {
     data = res.data;
     error = res.error;
   } catch (err: any) {
-    throw new GeminiError("unavailable", err?.message || "Could not reach the platform AI service.");
+    error = err;
+  }
+
+  // 2. Resilient second attempt: Directly call the live active deployed project function
+  // in case the client Supabase URL was initialized with an older project reference
+  if (error || !data || data.error) {
+    try {
+      const directRes = await fetch("https://acbulhegpywtzxrftfvc.supabase.co/functions/v1/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, model }),
+      });
+      if (directRes.ok) {
+        const directData = await directRes.json();
+        if (directData?.text) {
+          return String(directData.text).trim();
+        }
+      } else if (directRes.status === 429) {
+        notifyQuotaExhausted("Default platform Gemini API quota exceeded.");
+        throw new GeminiError("quota", "Default platform Gemini API rate limit reached.");
+      }
+    } catch (directErr: any) {
+      if (directErr instanceof GeminiError) throw directErr;
+    }
   }
 
   if (error) {
@@ -168,6 +192,7 @@ async function callGeminiProxy(prompt: string, model: string): Promise<string> {
           throw new GeminiError("quota", message);
         }
         if (parsed?.error === "AI_NOT_CONFIGURED") {
+          notifyQuotaExhausted(message);
           throw new GeminiError("not_configured", message);
         }
       } catch (parsed) {
@@ -179,14 +204,18 @@ async function callGeminiProxy(prompt: string, model: string): Promise<string> {
       notifyQuotaExhausted(message);
       throw new GeminiError("quota", message);
     }
-    if (status === 503) throw new GeminiError("not_configured", message);
+    if (status === 503) {
+      notifyQuotaExhausted(message);
+      throw new GeminiError("not_configured", message);
+    }
+    notifyQuotaExhausted(message);
     throw new GeminiError("unavailable", message);
   }
 
   if (data?.error) {
     const message = data?.message || "The platform AI service is unavailable.";
+    notifyQuotaExhausted(message);
     if (data.error === "QUOTA_EXCEEDED") {
-      notifyQuotaExhausted(message);
       throw new GeminiError("quota", message);
     }
     if (data.error === "AI_NOT_CONFIGURED") throw new GeminiError("not_configured", message);
@@ -272,6 +301,7 @@ export interface ConversationalStepResult {
   isFinished: boolean;
   extractedInsight?: string;
   isClarifying?: boolean;
+  isFallback?: boolean;
 }
 
 // 1. Clarification Interview Generator
@@ -448,11 +478,16 @@ STRICT RAW JSON only (no markdown, no extra text):
       isFinished: isLastQuestion && shouldAdvance,
       extractedInsight: parsed.extractedInsight || parsed.evaluationRationale,
       isClarifying: !shouldAdvance,
+      isFallback: false,
     };
   } catch (err) {
     console.warn("Conversational step failed, using fallback", err);
     handleGeminiError(err);
-    return getFallbackConversationalStep(surveyTitle, questions, userMessage, currentQuestionIndex);
+    const fallback = getFallbackConversationalStep(surveyTitle, questions, userMessage, currentQuestionIndex);
+    return {
+      ...fallback,
+      isFallback: true,
+    };
   }
 };
 

@@ -147,16 +147,26 @@ ${firstQ?.title || "How has your daily routine on campus been recently?"}`;
         currentQIndex
       );
 
+      if (step.isFallback) {
+        toast({
+          title: "⚡ Platform AI Rate-Limited / Offline",
+          description: "Using simulated response. Click the 'Gemini AI' badge in the top right to connect your own free key for live dynamic responses.",
+          variant: "destructive",
+        });
+      }
+
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: "ai",
         text: step.aiReply,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        badge: step.isClarifying 
-          ? "💡 Clarifying / Probing" 
-          : step.isFinished 
-            ? "🎉 Completed & Verified" 
-            : "✓ Response Verified",
+        badge: step.isFallback
+          ? "⚠️ Fallback Simulation (Add Key for Live AI)"
+          : step.isClarifying 
+            ? "💡 Clarifying / Probing" 
+            : step.isFinished 
+              ? "🎉 Completed & Verified" 
+              : "✓ Response Verified",
       };
 
       setMessages((prev) => [...prev, aiMsg]);
