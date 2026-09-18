@@ -8,13 +8,15 @@ export const getGeminiApiKey = (): string => {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored && stored.trim().length > 0) return stored.trim();
 
-  // Support VITE_GEMINI_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY from import.meta.env or process.env
+  // Support VITE_GEMINI_API_KEY, VITE_GEMINI_API, GEMINI_API_KEY, GOOGLE_API_KEY
   const candidate =
     (import.meta.env.VITE_GEMINI_API_KEY as string) ||
+    (import.meta.env.VITE_GEMINI_API as string) ||
     (import.meta.env.GEMINI_API_KEY as string) ||
+    (import.meta.env.GEMINI_API as string) ||
     (import.meta.env.GOOGLE_API_KEY as string) ||
     (import.meta.env.VITE_GOOGLE_API_KEY as string) ||
-    (typeof process !== "undefined" && (process.env?.GEMINI_API_KEY || process.env?.VITE_GEMINI_API_KEY || process.env?.GOOGLE_API_KEY)) ||
+    (typeof process !== "undefined" && (process.env?.GEMINI_API_KEY || process.env?.VITE_GEMINI_API_KEY || process.env?.VITE_GEMINI_API || process.env?.GOOGLE_API_KEY)) ||
     "";
 
   return typeof candidate === "string" ? candidate.trim() : "";
