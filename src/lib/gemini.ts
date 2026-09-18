@@ -19,6 +19,26 @@ export const hasGeminiApiKey = (): boolean => {
   return getGeminiApiKey().length > 0;
 };
 
+export const notifyQuotaExhausted = (detail?: string) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("gemini_quota_exhausted", {
+        detail: { message: detail || "Platform Gemini API quota reached or rate-limited." },
+      })
+    );
+  }
+};
+
+export const handleGeminiError = (err: any) => {
+  const msg = String(err?.message || err);
+  if (
+    err?.status === 429 ||
+    /429|resource_exhausted|quota|rate limit|too many requests/i.test(msg)
+  ) {
+    notifyQuotaExhausted("Platform Gemini API rate limit reached.");
+  }
+};
+
 // Interface definitions
 export interface ClarificationQuestion {
   id: string;
@@ -46,9 +66,18 @@ export interface GeneratedSurvey {
   questions: GeneratedQuestion[];
 }
 
+export interface GroundingSource {
+  id: string;
+  name: string;
+  content: string;
+  size?: number;
+  uploadedAt?: string;
+}
+
 export interface AuditResult {
   isValid: boolean;
   qualityScore: number; // 0 - 100
+  isRelevant?: boolean;
   flags: string[];
   feedback: string;
 }
@@ -243,12 +272,13 @@ Return your output STRICTLY as valid JSON:
   }
 };
 
-// 4. Academic Paper / Whitepaper Draft Generator
+// 4. Academic Paper / Whitepaper Draft Generator with Multi-Document Grounding
 export const generateAcademicPaperDraft = async (
   surveyTitle: string,
   surveyDescription: string,
   questions: GeneratedQuestion[],
-  responsesCount: number = 127
+  responsesCount: number = 127,
+  groundingSources: GroundingSource[] = []
 ): Promise<string> => {
   const apiKey = getGeminiApiKey();
 
@@ -262,6 +292,11 @@ export const generateAcademicPaperDraft = async (
 
     const questionsSummary = questions.map((q) => `- ${q.title} (Variable: ${q.dataExtracted || q.type})`).join("\n");
 
+    const sourcesSection = groundingSources && groundingSources.length > 0
+      ? `\n\nATTACHED RESEARCHER GROUNDING DOCUMENTS & LITERATURE NOTES (Integrate and cite these where applicable):\n` +
+        groundingSources.map((s, idx) => `[Source ${idx + 1}: ${s.name}]\n${s.content.slice(0, 3000)}`).join("\n\n")
+      : "";
+
     const prompt = `You are a distinguished research professor at the University of Ibadan.
 Write an authentic, publication-quality academic research paper draft based on empirical survey data collected via Research Connect NG.
 
@@ -270,37 +305,78 @@ Overview: "${surveyDescription}"
 Sample Size: N = ${responsesCount} verified Nigerian university undergraduate and postgraduate respondents.
 Question Variables Investigated:
 ${questionsSummary}
+${sourcesSection}
 
 Format the paper with clear academic markdown sections:
 # [Academic Title]
 ## Abstract
 (Structured: Background, Objectives, Methodology, Results, Conclusion)
 ## 1. Introduction & Context
-(Discuss current socio-economic indicators in Nigeria: inflation, transport costs, academic disruption)
+(Discuss current socio-economic indicators in Nigeria: inflation, transport costs, academic disruption, citing theoretical background)
 ## 2. Methodology & Sampling Framework
 (Describe verified student sampling, anti-fraud AI screening, demographic distribution)
 ## 3. Empirical Survey Findings
 (Quantitative breakdowns, percentages, Likert rating tables, and qualitative student quotations)
 ## 4. Discussion & Socio-Economic Implications
-(Comparative analysis between federal and state universities)
+(Comparative analysis between federal and state universities, grounded in attached literature)
 ## 5. Policy & Stakeholder Recommendations
 (Actionable interventions for university administrations, fintech platforms, and student welfare)
 ## References
-(Include 4-5 formal academic citations formatted in APA style relevant to African higher education economics).`;
+(Include 4-5 formal academic citations formatted in APA style relevant to African higher education economics and attached sources).`;
 
     const result = await model.generateContent(prompt);
     return result.response.text();
   } catch (err) {
+    handleGeminiError(err);
     return getFallbackAcademicPaper(surveyTitle, surveyDescription, responsesCount);
   }
 };
 
-// 5. Response Quality Auditor
+// 4b. 2-Host Audio Overview / Podcast Script Generator (NotebookLM Style)
+export const generateAudioOverviewScript = async (
+  surveyTitle: string,
+  paperContent: string
+): Promise<string> => {
+  const apiKey = getGeminiApiKey();
+
+  if (!apiKey) {
+    return getFallbackAudioOverviewScript(surveyTitle);
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `You are the executive producer of a Google NotebookLM-style "Deep Dive Audio Overview".
+Two Nigerian academic podcast hosts are discussing the empirical findings of the study: "${surveyTitle}".
+
+Hosts:
+- Dr. Ade (Senior Faculty Researcher): Methodical, analytical, contextualizes the big economic picture in Nigerian universities.
+- Chidinma (Field Research Lead): Relatable, energetic, shares what students actually said in the field, challenges, and quotes.
+
+Grounded Research Content:
+${paperContent.slice(0, 6000)}
+
+Format the output as a lively, authentic 2-host conversational dialogue transcript:
+Dr. Ade: ...
+Chidinma: ...`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (err) {
+    handleGeminiError(err);
+    return getFallbackAudioOverviewScript(surveyTitle);
+  }
+};
+
+// 5. Response Quality Auditor with Deep Semantic & Topical Relevance Check
 export const auditResponseQuality = async (
   question: string,
   answer: string
 ): Promise<AuditResult> => {
   const trimmed = answer.trim();
+
+  // 1. Basic length check
   if (trimmed.length < 3) {
     return {
       isValid: false,
@@ -310,6 +386,7 @@ export const auditResponseQuality = async (
     };
   }
 
+  // 2. Keyboard mashing or repetitive characters
   const mashingRegex = /(.)\1{4,}|[asdfghjkl]{5,}|[qwertyuiop]{5,}|[zxcvbnm]{5,}/i;
   if (mashingRegex.test(trimmed)) {
     return {
@@ -317,6 +394,17 @@ export const auditResponseQuality = async (
       qualityScore: 15,
       flags: ["gibberish_detected"],
       feedback: "Answer looks like random characters or keyboard mashing.",
+    };
+  }
+
+  // 3. Evasive one-word or non-answers
+  const evasiveRegex = /^(nothing|none|nil|n\/a|na|not applicable|i don'?t know|no idea|idk|nothing much|no comment|good|bad|fine|okay|ok|yes|no)$/i;
+  if (evasiveRegex.test(trimmed)) {
+    return {
+      isValid: false,
+      qualityScore: 25,
+      flags: ["evasive_response"],
+      feedback: "Response is evasive or non-informative. Please provide specific details to qualify for your reward.",
     };
   }
 
@@ -329,24 +417,37 @@ export const auditResponseQuality = async (
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `You are a data quality auditor for a research platform rewarding Nigerian students.
-Question asked: "${question}"
-Participant response: "${trimmed}"
+    const prompt = `You are a strict data quality auditor for Research Connect NG, evaluating survey responses from Nigerian university undergraduates.
 
-Evaluate if this response is authentic and substantive.
+Question Asked: "${question}"
+Student's Response: "${trimmed}"
+
+Audit this response across TWO critical criteria:
+1. TOPICAL RELEVANCE: Does this response actually answer or address the subject matter asked in the question? If the response talks about something completely unrelated (e.g. European football, movies, unrelated personal complaints, or generic dodging), mark isValid = false, isRelevant = false, and flag as "off_topic".
+2. SUBSTANCE & SINCERITY: Is this an authentic human perspective with meaningful detail, or just gibberish, automated copy-paste, or low-effort filler?
+
 Output STRICTLY valid JSON:
 {
-  "isValid": true,
-  "qualityScore": 85,
-  "flags": [],
-  "feedback": "1-sentence assessment"
+  "isValid": boolean,
+  "qualityScore": number (0 to 100),
+  "isRelevant": boolean,
+  "flags": string[],
+  "feedback": "1-sentence assessment explaining why it passed or what is missing"
 }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
     const cleanJson = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
-    return JSON.parse(cleanJson);
+    const parsed = JSON.parse(cleanJson);
+    return {
+      isValid: Boolean(parsed.isValid && parsed.isRelevant !== false),
+      qualityScore: typeof parsed.qualityScore === "number" ? parsed.qualityScore : 75,
+      isRelevant: parsed.isRelevant !== false,
+      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
+      feedback: parsed.feedback || "Response processed.",
+    };
   } catch (err) {
+    handleGeminiError(err);
     return getHeuristicAudit(question, trimmed);
   }
 };
@@ -520,6 +621,19 @@ function getFallbackConversationalStep(
   userMessage: string,
   currentQuestionIndex: number
 ): ConversationalStepResult {
+  const words = userMessage.trim().split(/\s+/).filter(Boolean);
+  const currentQ = questions[currentQuestionIndex];
+
+  // If answer is too brief or evasive, gently probe before advancing
+  if (words.length < 3) {
+    return {
+      aiReply: `I hear you, but could you tell me a little more specifically about that? For example, how does this affect you personally regarding: "${currentQ?.title}"?`,
+      nextQuestionIndex: currentQuestionIndex,
+      isFinished: false,
+      extractedInsight: "Probing for more specific student context.",
+    };
+  }
+
   const isLast = currentQuestionIndex >= questions.length - 1;
 
   if (isLast) {
@@ -549,22 +663,114 @@ function getFallbackConversationalStep(
 }
 
 function getHeuristicAudit(question: string, answer: string): AuditResult {
-  const wordCount = answer.trim().split(/\s+/).length;
-  if (wordCount < 4) {
+  const trimmed = answer.trim().toLowerCase();
+  const words = trimmed.split(/\s+/).filter(Boolean);
+
+  // 1. Minimum words check
+  if (words.length < 4) {
     return {
       isValid: false,
-      qualityScore: 40,
-      flags: ["low_effort"],
-      feedback: "Answer is too brief. Please write at least one complete sentence.",
+      qualityScore: 30,
+      isRelevant: false,
+      flags: ["too_brief"],
+      feedback: "Answer is too brief. Please write at least one complete sentence to qualify for your reward.",
     };
   }
 
+  // 2. Repetitive filler check
+  const uniqueWords = new Set(words);
+  if (words.length >= 5 && uniqueWords.size / words.length < 0.4) {
+    return {
+      isValid: false,
+      qualityScore: 20,
+      isRelevant: false,
+      flags: ["repetitive_filler"],
+      feedback: "Answer contains repetitive filler text without meaningful content.",
+    };
+  }
+
+  // 3. Extract meaningful keyword tokens from question
+  const stopWords = new Set([
+    "what", "when", "where", "which", "how", "does", "your", "with", "have", "about",
+    "this", "that", "from", "their", "they", "will", "would", "could", "should",
+    "please", "describe", "explain", "tell", "share", "many", "much", "more", "most",
+    "some", "other", "than", "then", "into", "onto", "over", "under", "been", "were"
+  ]);
+
+  const cleanQuestionWords = question
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !stopWords.has(w));
+
+  // Thematic domain vocabulary for campus demographic research in Nigeria
+  const campusDomainVocab = new Set([
+    "campus", "school", "university", "faculty", "hostel", "lecture", "exam", "class",
+    "money", "naira", "cost", "price", "pay", "fee", "budget", "allowance", "food",
+    "commute", "transport", "shuttle", "bus", "keke", "bike", "walk", "gate",
+    "power", "light", "electricity", "generator", "charge", "study", "reading",
+    "cgpa", "course", "department", "semester", "student", "strike", "fuel", "subsidy",
+    "stress", "hard", "challenge", "difficult", "manage", "survive", "coping"
+  ]);
+
+  const matchesQuestion = words.some((w) =>
+    cleanQuestionWords.some((qw) => w.includes(qw) || qw.includes(w))
+  );
+
+  const matchesDomain = words.some((w) => campusDomainVocab.has(w));
+
+  // Detect explicitly off-topic chatter (e.g. sports, entertainment, gaming, crypto)
+  const offTopicVocab = ["arsenal", "chelsea", "ronaldo", "messi", "bet9ja", "sportybet", "crypto", "bitcoin", "playstation", "fifa"];
+  const isExplicitlyOffTopic = words.some((w) => offTopicVocab.includes(w));
+
+  if (isExplicitlyOffTopic && !matchesQuestion) {
+    return {
+      isValid: false,
+      qualityScore: 25,
+      isRelevant: false,
+      flags: ["off_topic"],
+      feedback: "Response appears unrelated to the research question asked.",
+    };
+  }
+
+  if (!matchesQuestion && !matchesDomain && words.length < 12) {
+    return {
+      isValid: false,
+      qualityScore: 40,
+      isRelevant: false,
+      flags: ["potential_off_topic"],
+      feedback: "Response does not seem directly related to the question topic. Please answer specifically.",
+    };
+  }
+
+  const quality = Math.min(70 + words.length * 2 + (matchesQuestion ? 15 : 5), 98);
   return {
     isValid: true,
-    qualityScore: Math.min(75 + wordCount * 2, 98),
+    qualityScore: quality,
+    isRelevant: true,
     flags: [],
-    feedback: "High-quality substantive response verified.",
+    feedback: matchesQuestion
+      ? "Directly relevant and substantive response verified."
+      : "Substantive response verified.",
   };
+}
+
+function getFallbackAudioOverviewScript(title: string): string {
+  return `[THEME MUSIC: Soft, contemporary afrobeats opening chime]
+
+Dr. Ade: Welcome to the Research Connect Academic Briefing. Today, we're doing a deep dive into an empirical dataset that really hits close to home for anyone following Nigerian tertiary education: "${title}". I'm Dr. Ade, and with me is our lead field analyst, Chidinma.
+
+Chidinma: Thanks, Dr. Ade. Looking at these numbers across N = 127 verified students from universities across Nigeria, this isn't just dry statistics. We're seeing acute elasticity in how students are surviving semester shocks.
+
+Dr. Ade: Exactly. Over 74% of respondents reported direct disruption to their daily routines. But what caught my attention in Section 3 was the transit data. Students aren't just adjusting budgets—they're physically walking 2 to 3 kilometers under the afternoon sun just to preserve ₦600 for course handouts.
+
+Chidinma: And notice how peer fintech pooling—Moniepoint, OPay, Kuda—has become the de facto emergency safety net. Hostel mates are literally pooling micro-transfers to buy cooking items in bulk. Without that mutual aid, drop-out rates would be significantly higher.
+
+Dr. Ade: Which leads directly to the policy recommendations in Section 5. University governing councils cannot treat campus shuttle fares as an unregulated private market. Digital fare caps at ₦100 and emergency food vouchers aren't luxuries; they're basic prerequisites for academic persistence.
+
+Chidinma: Absolutely. If you're using this data for your thesis or institutional grant, the complete cross-tabulations and APA citations are in the dossier ready for download.
+
+[THEME MUSIC: Outro fade]`;
 }
 
 function getFallbackInsights(title: string, responseCount: number): SurveyInsights {

@@ -529,13 +529,17 @@ export const TakeSurvey = () => {
                       ) : audit ? (
                         audit.isValid ? (
                           <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-800">
-                            <ShieldCheck className="w-4 h-4" />
-                            <span>Authenticity Verified ({audit.qualityScore}/100) — +₦{survey.reward_amount} reward unlocked</span>
+                            <ShieldCheck className="w-4 h-4 shrink-0" />
+                            <span>Relevance & Authenticity Verified ({audit.qualityScore}/100) — +₦{survey.reward_amount} reward unlocked</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/50 px-2.5 py-1 rounded-md border border-amber-200 dark:border-amber-800">
-                            <AlertTriangle className="w-4 h-4" />
-                            <span>{audit.feedback || "Response is too brief to qualify for reward."}</span>
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>
+                              {audit.flags?.includes("off_topic")
+                                ? `⚠️ Off-Topic Response: ${audit.feedback}`
+                                : audit.feedback || "Response is too brief or evasive to qualify for reward."}
+                            </span>
                           </div>
                         )
                       ) : (
