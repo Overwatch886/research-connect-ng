@@ -256,53 +256,61 @@ export const conductConversationalStep = async (
       .map((h) => `${h.sender === "user" ? "Student" : "Interviewer"}: ${h.text}`)
       .join("\n");
 
+    // Build question context — type and options are critical for evaluation
+    const qType = currentQ?.type || "long";
+    const qOptions = currentQ?.options?.length
+      ? `\nAnswer Options: ${currentQ.options.map((o, i) => `${i + 1}. "${o}"`).join(", ")}`
+      : "";
+    const qTypeNote =
+      qType === "rating"
+        ? "\n⚠️ RATING QUESTION (scale 1–5): Any number, or sentiment word like 'very poor', 'bad', 'okay', 'good', 'excellent', 'terrible' IS a complete substantive answer. NEVER classify these as evasive."
+        : qType === "multiple" || qType === "checkbox"
+        ? `\n⚠️ MULTIPLE CHOICE QUESTION: If the student selects or mentions any of the answer options — even 1–3 words — that IS a substantive answer. Do not demand longer answers for MCQ.${qOptions}`
+        : "";
+
     const prompt = `You are "Ada", an empathetic, highly skilled Nigerian academic field researcher conducting an interactive conversational survey for the study: "${surveyTitle}".
 
-Current Question to investigate:
+Current Question (${currentQuestionIndex + 1} of ${questions.length}):
 "${currentQ?.title || "Final thoughts"}"
+Question Type: ${qType}${qTypeNote}
 
-Target Research Objective:
-"${currentQ?.rationale || "Student context"}"
+Research Objective: "${currentQ?.rationale || "Student context"}"
 
-Recent conversation history:
+Full conversation so far:
 ${formattedHistory}
 
 Latest student reply:
 "${userMessage}"
 
-EVALUATION PROTOCOL:
-Step 1: Classify the student's message into ONE of four intent categories:
-1. "question_clarification": The student asks what a term means (e.g., "What does administrative bodies mean?", "Who are you asking about?"), asks for clarification, expresses confusion, or asks a question.
-2. "evasive_or_non_answer": The student gives an evasive, non-informative, dismissive, or 1-word non-answer (e.g., "nothing", "idk", "i don't know", "fine", "cool", "okay", "no idea", "none", "skip", "whatever", "not really").
-3. "off_topic": The student talks about something completely unrelated to the research study (e.g. Premier League football, movies, music, random banter, greetings without content like "hello how are you").
-4. "substantive_valid_answer": The student provides a genuine, meaningful answer, personal experience, opinion, or factual response that directly addresses the current question.
+EVALUATION PROTOCOL — read carefully:
 
-Step 2: Act strictly according to the intent:
-- IF "question_clarification":
-  - "shouldAdvance" MUST BE false.
-  - In "aiReply": Answer their question directly and warmly using authentic Nigerian campus context (e.g., explain that administrative bodies include the Dean of Student Affairs/DSA, Exams and Records, Faculty/Departmental officers, Bursary, or Portal Admin). Then gently ask them to share their own experience or encounter with that office on the CURRENT question.
-- IF "evasive_or_non_answer":
-  - "shouldAdvance" MUST BE false.
-  - In "aiReply": Empathize warmly in friendly Nigerian student tone (e.g., "No wahala at all! Even if nothing major happened...", "Take your time!"). Provide an accessible, relatable campus example and prompt them with a simple follow-up question on the CURRENT topic.
-- IF "off_topic":
-  - "shouldAdvance" MUST BE false.
-  - In "aiReply": Acknowledge humorously or politely, but gently refocus them on the survey topic and ask for their experience on the CURRENT question.
-- IF "substantive_valid_answer":
-  - "shouldAdvance" MUST BE true.
-  - In "aiReply": Acknowledge their response with warmth and empathy (e.g., "That is such an important point", "Navigating that kind of delay takes serious patience").
-  ${
+Step 1 — Classify the reply into ONE of:
+1. "question_clarification": Student asks for clarification, asks what a term means, or seems confused. SPECIAL RULE: If they ALSO provided an answer in the same message (e.g. "I mainly use cash, should I still answer?"), the content they provided counts as an answer — acknowledge it and advance.
+2. "evasive_or_non_answer": Student gives a completely empty or non-informative response ("idk", "skip", "whatever", "I don't care", etc.) — NOT answering at all. IMPORTANT: "very poor", "never", "always", "cash only", any option selection — these are NOT evasive even if short.
+3. "off_topic": Completely unrelated topic (sports, movies, gaming). Note: discussing payment methods, cash, mobile money for a banking survey is fully on-topic.
+4. "substantive_valid_answer": Student provides ANY real response to the question. Be generous — short answers like "very poor", "I prefer cash", "South-West", picking an option, expressing a preference or experience all qualify. This is the DEFAULT classification when in doubt.
+
+Step 2 — Reply rules:
+- ALWAYS reference what the student ACTUALLY SAID in your aiReply. Never give a generic template.
+- For "question_clarification" with embedded answer: acknowledge their answer AND answer their question, then advance (shouldAdvance: true).
+- For "evasive_or_non_answer": empathize warmly in Nigerian student tone, give a relatable campus example, prompt specifically.
+- For "off_topic": briefly acknowledge, gently redirect to the survey.
+- For "substantive_valid_answer": 
+  * Warmly acknowledge THEIR SPECIFIC response (e.g. "That makes total sense — using cash keeps you from network stress")
+  * shouldAdvance: true
+  * ${
     isLastQuestion
-      ? '-> Conclude warmly: thank them enthusiastically for completing the interview and confirm their ₦500 reward has been approved and credited to their student wallet!'
-      : `-> Smoothly and naturally transition into the NEXT question: "${questions[currentQuestionIndex + 1]?.title}"`
+      ? "Conclude warmly: thank them enthusiastically, confirm their reward has been approved and credited to their student wallet!"
+      : "Transition naturally to the next question: \"" + (questions[currentQuestionIndex + 1]?.title || "Final thoughts") + "\""
   }
 
-STRICT RAW JSON OUTPUT (no markdown backticks, just valid JSON):
+STRICT RAW JSON only (no markdown, no extra text):
 {
   "userIntent": "question_clarification" | "evasive_or_non_answer" | "off_topic" | "substantive_valid_answer",
-  "evaluationRationale": "1 sentence explaining why this message does or does not answer the question",
-  "shouldAdvance": false or true,
-  "aiReply": "Ada's conversational reply",
-  "extractedInsight": "1-sentence summary of what was learned or why probed"
+  "evaluationRationale": "1 sentence why you classified it this way",
+  "shouldAdvance": true or false,
+  "aiReply": "Ada's reply — must mention what the student actually said",
+  "extractedInsight": "1-sentence summary of insight gained"
 }`;
 
     const result = await model.generateContent(prompt);
@@ -761,19 +769,61 @@ function getFallbackConversationalStep(
   const words = lower.split(/\s+/).filter(Boolean);
   const currentQ = questions[currentQuestionIndex];
   const qTitleLower = (currentQ?.title || "").toLowerCase();
+  const qType = currentQ?.type || "long";
+
+  // --- Smart short-answer validation for structured question types ---
+  // For rating/multiple/checkbox questions, short responses are perfectly valid
+  const isRatingAnswer = qType === "rating" && (
+    /^[1-5]$/.test(trimmed) ||
+    /^(very poor|poor|average|good|excellent|terrible|bad|okay|ok|great|fair|very good|not good|horrible|awful)$/i.test(trimmed)
+  );
+  const matchesOption = currentQ?.options?.some(
+    (opt) => opt.toLowerCase().includes(lower) || lower.includes(opt.toLowerCase().split(" ")[0])
+  );
+  const isStructuredAnswer = (qType === "multiple" || qType === "checkbox" || qType === "rating") 
+    && (isRatingAnswer || matchesOption || words.length >= 2);
 
   // 1. Check for Question / Clarification Request
+  // Only classify as question if it ends with "?" AND has no substantive content before it
+  const hasActualContent = words.length >= 5 && !trimmed.endsWith("?");
   const isQuestion = 
-    trimmed.endsWith("?") ||
-    /^(what|who|which|how|why|where|can you|could you|explain|meaning|clarify)\b/i.test(trimmed) ||
-    /what do you mean|who are|who is|i don'?t understand|what is|meaning of/i.test(lower);
+    !hasActualContent && (
+      trimmed.endsWith("?") ||
+      /^(what|who|which|how|why|where|can you|could you|explain|meaning|clarify)\b/i.test(trimmed) ||
+      /what do you mean|who are|who is|i don't understand|what is|meaning of/i.test(lower)
+    );
+
+  // Special case: message has content PLUS a question (like "I use cash, should I still answer?")
+  const hasContentAndQuestion = trimmed.endsWith("?") && words.length >= 8;
+
+  if (hasContentAndQuestion) {
+    // Treat the content as the answer, acknowledge and advance
+    const isLast = currentQuestionIndex >= questions.length - 1;
+    if (isLast) {
+      return {
+        aiReply: `Thank you so much for that honest response! The fact that you primarily use cash is itself a really valuable data point for our study on "${surveyTitle}". Your ₦${questions.length > 0 ? "reward" : "500"} has been credited to your student wallet! 🎓`,
+        nextQuestionIndex: currentQuestionIndex + 1,
+        isFinished: true,
+        extractedInsight: "Student prefers cash — shared relevant context alongside clarification request.",
+        isClarifying: false,
+      };
+    }
+    const nextQ = questions[currentQuestionIndex + 1];
+    return {
+      aiReply: `That is actually really useful context — preferring cash over mobile platforms is itself a valuable perspective for this research! To answer your question: yes, please do share whichever platform you use most (even occasionally), or if cash is truly your primary method, that's a valid answer too. Moving on: "${nextQ?.title}"`,
+      nextQuestionIndex: currentQuestionIndex + 1,
+      isFinished: false,
+      extractedInsight: "Student uses cash primarily — provided content alongside clarification request.",
+      isClarifying: false,
+    };
+  }
 
   if (isQuestion) {
     let explanation = "By this, we're looking at your direct personal experience on campus.";
     if (/admin|body|bodies|management|governance|authority/i.test(qTitleLower) || /admin/i.test(lower)) {
       explanation = "By 'administrative bodies', we mean campus offices like your Dean of Student Affairs (DSA), Exams and Records, your Departmental or Faculty Officers, the Bursary, or the Student Portal managers.";
-    } else if (/budget|money|fintech|bank|cost|allowance|food/i.test(qTitleLower)) {
-      explanation = "We're exploring how everyday costs—like food, transport fares, course handouts, or phone data—affect your weekly allowance and personal budget.";
+    } else if (/budget|money|fintech|bank|cost|allowance|food|payment|transfer/i.test(qTitleLower)) {
+      explanation = "We're exploring how everyday transactions — like paying for food, transport fares, or course handouts — work for you day-to-day.";
     } else if (/power|light|electricity|generator/i.test(qTitleLower)) {
       explanation = "We're looking at how campus power cuts and lodge blackout hours disrupt your studying, phone/laptop charging, and semester preparations.";
     }
@@ -798,30 +848,7 @@ function getFallbackConversationalStep(
     };
   }
 
-  // 3. Check for Evasive, 1-Word, or Non-Answers
-  const evasiveRegex = /^(nothing|none|nil|n\/a|na|not applicable|i don'?t know|no idea|idk|nothing much|no comment|good|bad|fine|okay|ok|cool|skip|next|whatever|i don'?t care|can'?t say|haven'?t seen|not sure|not really|nothing really|nope|nah|yes|no)$/i;
-  const isEvasive = evasiveRegex.test(trimmed) || words.length < 4;
-
-  if (isEvasive) {
-    let probeContext = "even small daily routines count!";
-    if (/admin/i.test(qTitleLower)) {
-      probeContext = "for example, have you had to queue at Exams & Records, fix an issue with course registration, or deal with hostel clearance?";
-    } else if (/budget|money|fintech/i.test(qTitleLower)) {
-      probeContext = "like whether transport fares or food prices have made you cut back on something this week?";
-    } else if (/power|electric/i.test(qTitleLower)) {
-      probeContext = "like how you manage to charge your phone or study when there is a blackout?";
-    }
-
-    return {
-      aiReply: `No wahala at all! Take your time—${probeContext} How has that been for you personally?`,
-      nextQuestionIndex: currentQuestionIndex,
-      isFinished: false,
-      extractedInsight: "Probed for substantive personal student experience.",
-      isClarifying: true,
-    };
-  }
-
-  // 4. Check for Explicitly Off-Topic chatter (sports, betting, crypto, gaming)
+  // 3. Check for Explicitly Off-Topic chatter (sports, betting, crypto, gaming)
   const offTopicTerms = ["arsenal", "chelsea", "man united", "real madrid", "ronaldo", "messi", "sportybet", "bet9ja", "crypto", "bitcoin", "fifa"];
   if (words.some((w) => offTopicTerms.includes(w))) {
     return {
@@ -833,11 +860,38 @@ function getFallbackConversationalStep(
     };
   }
 
+  // 4. Check for Evasive, non-answers — ONLY for truly empty/dismissive responses
+  // DO NOT flag short answers for rating/MCQ questions as evasive
+  const evasiveRegex = /^(nothing|none|nil|n\/a|na|not applicable|i don'?t know|no idea|idk|nothing much|no comment|skip|next|whatever|i don'?t care|can'?t say|nope|nah)$/i;
+  const isEvasive = !isStructuredAnswer && (
+    evasiveRegex.test(trimmed) || 
+    (words.length < 3 && !isRatingAnswer && !matchesOption && qType === "long")
+  );
+
+  if (isEvasive) {
+    let probeContext = "even small daily routines count!";
+    if (/admin/i.test(qTitleLower)) {
+      probeContext = "for example, have you had to queue at Exams & Records, fix an issue with course registration, or deal with hostel clearance?";
+    } else if (/budget|money|fintech|payment|bank/i.test(qTitleLower)) {
+      probeContext = "like whether you've had a failed transfer, network downtime while paying for food, or any frustrating mobile money experience?";
+    } else if (/power|electric/i.test(qTitleLower)) {
+      probeContext = "like how you manage to charge your phone or study when there is a blackout?";
+    }
+
+    return {
+      aiReply: `No wahala at all! Take your time — ${probeContext} How has that been for you personally?`,
+      nextQuestionIndex: currentQuestionIndex,
+      isFinished: false,
+      extractedInsight: "Probed for substantive personal student experience.",
+      isClarifying: true,
+    };
+  }
+
   // 5. Valid Substantive Answer: Advance!
   const isLast = currentQuestionIndex >= questions.length - 1;
   if (isLast) {
     return {
-      aiReply: `Thank you so much for sharing that! That is genuine, authentic data that will really help our research on "${surveyTitle}". Your response has been verified and validated by our AI quality check, and your ₦500 reward has just been credited to your student wallet! 🎓`,
+      aiReply: `Thank you so much for sharing that! That is genuine, authentic data that will really help our research on "${surveyTitle}". Your response has been verified and your reward has just been credited to your student wallet! 🎓`,
       nextQuestionIndex: currentQuestionIndex + 1,
       isFinished: true,
       extractedInsight: "Student provided comprehensive qualitative perspective.",
@@ -846,21 +900,23 @@ function getFallbackConversationalStep(
   }
 
   const nextQ = questions[currentQuestionIndex + 1];
-  const transitions = [
-    `That is such an important point. It really captures the day-to-day reality of Nigerian students right now. Moving to our next question: "${nextQ?.title}"`,
-    `I hear you loud and clear. That takes serious resilience to deal with. To explore this a bit further: "${nextQ?.title}"`,
-    `Thank you for being so honest about that—this is exactly the type of empirical insight researchers need. Let's move to: "${nextQ?.title}"`,
+  // Build a contextual acknowledgement that references what the student said
+  const ackPhrases = [
+    `That's a really insightful perspective — "${trimmed.length > 60 ? trimmed.slice(0, 57) + "..." : trimmed}" is exactly the kind of lived experience this study needs.`,
+    `Thank you for that! Understanding that you ${lower.slice(0, 50)}... gives us great empirical context.`,
+    `Noted — and honestly that reflects what many Nigerian students deal with. Appreciate you sharing that.`,
   ];
-  const chosenReply = transitions[currentQuestionIndex % transitions.length];
+  const ack = ackPhrases[currentQuestionIndex % ackPhrases.length];
 
   return {
-    aiReply: chosenReply,
+    aiReply: `${ack} Moving on: "${nextQ?.title}"`,
     nextQuestionIndex: currentQuestionIndex + 1,
     isFinished: false,
     extractedInsight: `Recorded student perspective for question ${currentQuestionIndex + 1}.`,
     isClarifying: false,
   };
 }
+
 
 function getHeuristicAudit(question: string, answer: string): AuditResult {
   const trimmed = answer.trim().toLowerCase();
