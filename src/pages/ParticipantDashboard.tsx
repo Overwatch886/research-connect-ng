@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Search, AlertCircle, LayoutGrid, List } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Search, AlertCircle, LayoutGrid, List, GraduationCap, Microscope, ShieldCheck, CheckCircle2, Sparkles } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -210,13 +211,48 @@ const ParticipantDashboard = () => {
       
       <main className="flex-grow container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
-          </h1>
-          <p className="text-muted-foreground">
-            Browse available surveys and earn rewards for your participation.
-          </p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">
+                <GraduationCap className="w-3.5 h-3.5 mr-1" /> Student Participant & Earner Portal
+              </Badge>
+              {profile?.is_verified ? (
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Verified Student ({profile.university?.split("(")[0].trim() || "Institutional"})
+                </Badge>
+              ) : (
+                <Link to="/verify-student">
+                  <Badge variant="secondary" className="text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 cursor-pointer">
+                    ⚠️ Verify Student ID / .edu.ng to Withdraw
+                  </Badge>
+                </Link>
+              )}
+            </div>
+            <h1 className="text-3xl font-bold mb-1">
+              Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}! 🎓
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Participate in verified academic demographic studies, chat with AI surveyor Ada, and earn instant cash rewards.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button variant="outline" asChild className="text-xs gap-1.5 border-indigo-200 hover:bg-indigo-50 text-indigo-700 dark:text-indigo-300 shadow-sm">
+              <Link to="/dashboard">
+                <Microscope className="w-4 h-4 text-indigo-600" />
+                <span>Switch to Researcher Studio</span>
+              </Link>
+            </Button>
+            {!profile?.is_verified && (
+              <Button asChild className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                <Link to="/verify-student">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Verify Student Status</span>
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Main Grid Layout */}

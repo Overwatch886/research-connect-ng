@@ -16,10 +16,13 @@ import {
   Loader2, 
   Send,
   Building,
-  GraduationCap
+  GraduationCap,
+  Bot,
+  FileText
 } from "lucide-react";
 import { auditResponseQuality, AuditResult } from "@/lib/gemini";
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
+import { ConversationalSurveyor } from "@/components/ConversationalSurveyor";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -126,6 +129,7 @@ export const TakeSurvey = () => {
   const [auditingField, setAuditingField] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [surveyMode, setSurveyMode] = useState<"conversational" | "form">("conversational");
   const [startTime] = useState<number>(Date.now());
 
   useEffect(() => {
@@ -347,8 +351,47 @@ export const TakeSurvey = () => {
           </div>
         </div>
 
-        {/* Survey Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Dual Mode Switcher */}
+        <div className="flex items-center justify-center mb-6">
+          <div className="bg-muted p-1 rounded-2xl border flex items-center gap-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setSurveyMode("conversational")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                surveyMode === "conversational"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Bot className="w-4 h-4" />
+              <span>🎙️ AI Conversational Interview (Recommended)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSurveyMode("form")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                surveyMode === "form"
+                  ? "bg-background text-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>📝 Classic Form</span>
+            </button>
+          </div>
+        </div>
+
+        {surveyMode === "conversational" ? (
+          <ConversationalSurveyor
+            surveyId={survey.id}
+            surveyTitle={survey.title}
+            rewardAmount={survey.reward_amount}
+            questions={survey.questions}
+            onFinish={() => setIsSubmitted(true)}
+          />
+        ) : (
+          /* Survey Form */
+          <form onSubmit={handleSubmit} className="space-y-6">
           {survey.questions.map((q, idx) => {
             const audit = auditStates[q.id];
             const isAuditing = auditingField === q.id;
@@ -541,6 +584,7 @@ export const TakeSurvey = () => {
             </Button>
           </div>
         </form>
+        )}
       </main>
     </div>
   );

@@ -83,11 +83,12 @@ const Signup = () => {
           return;
         }
 
+        const targetPath = role === "participant" ? "/surveys" : "/dashboard";
         toast({
           title: "Account created!",
-          description: "Welcome to ResearchNaija. Redirecting to dashboard...",
+          description: `Welcome to ResearchNaija. Redirecting to ${role === "participant" ? "Student Earner" : "Researcher"} portal...`,
         });
-        navigate("/dashboard");
+        navigate(targetPath);
       }
     } catch (error: any) {
       // Map errors to safe user messages to prevent information disclosure

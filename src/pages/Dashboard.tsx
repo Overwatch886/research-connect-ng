@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { 
@@ -22,7 +23,9 @@ import {
   ShieldAlert,
   ShieldCheck,
   Loader2,
-  Sparkles
+  Sparkles,
+  Microscope,
+  GraduationCap
 } from "lucide-react";
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { AiInsightsModal } from "@/components/AiInsightsModal";
@@ -112,61 +115,75 @@ const Dashboard = () => {
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-card border-r border-border p-4 hidden lg:block">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <FileText className="w-5 h-5 text-primary-foreground" />
+        <Link to="/" className="flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-sm">
+            <FileText className="w-5 h-5 text-white" />
           </div>
           <span className="font-display font-bold text-xl text-foreground">
-            Research<span className="text-primary">Naija</span>
+            Research<span className="text-indigo-600 dark:text-indigo-400">Naija</span>
           </span>
         </Link>
 
+        {/* Studio Indicator */}
+        <div className="mb-6 px-1">
+          <Badge variant="outline" className="w-full justify-center py-1 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300">
+            <Microscope className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+            <span>Researcher Studio</span>
+          </Badge>
+        </div>
+
         {/* Navigation */}
-        <nav className="space-y-2">
+        <nav className="space-y-1.5">
           <Link 
             to="/dashboard" 
-            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-indigo-600 text-white shadow-sm font-medium text-sm"
           >
-            <BarChart3 className="w-5 h-5" />
-            <span className="font-medium">Dashboard</span>
+            <BarChart3 className="w-4 h-4" />
+            <span>My Studies & Analytics</span>
           </Link>
+          <Link 
+            to="/create-survey" 
+            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4 text-indigo-500" />
+            <span>AI Survey Architect</span>
+          </Link>
+          <Link 
+            to="/pricing" 
+            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-sm"
+          >
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            <span>Escrow & Pricing</span>
+          </Link>
+
+          <div className="pt-4 pb-2">
+            <div className="border-t border-border/70 my-2" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-4">Switch Portal</span>
+          </div>
+
           <Link 
             to="/surveys" 
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-emerald-700 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100 border border-emerald-200/60 dark:border-emerald-800 transition-colors text-xs font-semibold"
           >
-            <FileText className="w-5 h-5" />
-            <span>My Surveys</span>
-          </Link>
-          <Link 
-            to="/responses" 
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-          >
-            <Users className="w-5 h-5" />
-            <span>Responses</span>
-          </Link>
-          <Link 
-            to="/settings" 
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-            <span>Settings</span>
+            <GraduationCap className="w-4 h-4" />
+            <span>Student Earner Feed ➔</span>
           </Link>
         </nav>
 
         {/* Bottom Actions */}
         <div className="absolute bottom-4 left-4 right-4 space-y-2">
-          <Button className="w-full" asChild>
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
             <Link to="/create-survey">
-              <Plus className="w-5 h-5 mr-2" />
-              Create Survey
+              <Plus className="w-4 h-4 mr-1.5" />
+              Launch New Study
             </Link>
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full text-muted-foreground hover:text-destructive"
+            className="w-full text-muted-foreground hover:text-destructive text-xs"
             onClick={handleLogout}
           >
-            <LogOut className="w-5 h-5 mr-2" />
+            <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>
         </div>
@@ -179,24 +196,30 @@ const Dashboard = () => {
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex-1 max-w-md">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Search surveys..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Search research studies..."
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" asChild className="hidden sm:flex text-xs gap-1.5 border-emerald-200 hover:bg-emerald-50 text-emerald-700 dark:text-emerald-300">
+                <Link to="/surveys">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Student Earner View</span>
+                </Link>
+              </Button>
               <GeminiKeyModal variant="badge" />
               <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                <Bell className="w-4 h-4 text-muted-foreground" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full" />
               </button>
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-medium">
+              <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                 {getInitials()}
               </div>
             </div>
@@ -204,42 +227,39 @@ const Dashboard = () => {
         </header>
 
         <div className="p-6">
-          {/* Verification Banner */}
-          {profile && !profile.is_verified && (
-            <div className="mb-6 bg-warning/10 border border-warning/30 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
-                  <ShieldAlert className="w-5 h-5 text-warning" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-foreground">Verify Your Student Status</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Complete verification to participate in surveys and earn rewards
-                  </p>
-                </div>
+          {/* Researcher Studio Banner */}
+          <div className="mb-6 rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white p-5 sm:p-6 shadow-md border border-indigo-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                  🔬 Academic Research Studio
+                </span>
+                <span className="text-xs text-indigo-200 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-300" /> Powered by Gemini 1.5 Flash
+                </span>
               </div>
-              <Button asChild>
-                <Link to="/verify-student">Verify Now</Link>
+              <h2 className="text-lg sm:text-xl font-bold text-white">
+                Empirical Research & Institutional Sampling Hub
+              </h2>
+              <p className="text-xs text-indigo-200/90 max-w-xl">
+                Design adaptive demographic surveys, auto-screen student responses with anti-fraud AI, and generate 1-click APA academic whitepaper drafts.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2.5 shrink-0">
+              <Button size="sm" className="bg-white text-indigo-950 hover:bg-indigo-50 text-xs font-semibold shadow" asChild>
+                <Link to="/create-survey">
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Launch New Survey
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs border-indigo-400/40 text-white hover:bg-indigo-800/60" asChild>
+                <Link to="/surveys">
+                  <GraduationCap className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                  Switch to Student View
+                </Link>
               </Button>
             </div>
-          )}
-
-          {profile?.is_verified && (
-            <div className="mb-6 bg-success/10 border border-success/30 rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <h3 className="font-medium text-foreground flex items-center gap-2">
-                  Verified Student
-                  <CheckCircle className="w-4 h-4 text-success" />
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {profile.university || "Student status verified"}
-                </p>
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Welcome Section */}
           <div className="mb-8">

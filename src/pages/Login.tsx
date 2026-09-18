@@ -28,11 +28,13 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
+        const userRole = data.user.user_metadata?.role;
+        const targetPath = userRole === "participant" ? "/surveys" : "/dashboard";
         toast({
           title: "Welcome back!",
-          description: "Redirecting to dashboard...",
+          description: `Redirecting to ${userRole === "participant" ? "Student Earner" : "Researcher"} portal...`,
         });
-        navigate("/dashboard");
+        navigate(targetPath);
       }
     } catch (error: any) {
       // Map errors to safe user messages to prevent information disclosure
