@@ -59,14 +59,26 @@ export const AuthHandler = () => {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
           try {
-            // Check profiles table for user role
+            // Check profiles table for user role & verification
             const { data: profile } = await supabase
               .from("profiles")
-              .select("role")
+              .select("role, is_verified")
               .eq("user_id", session.user.id)
               .maybeSingle();
 
             const role = profile?.role || session.user.user_metadata?.role || "researcher";
+            const isVerified = profile?.is_verified ?? false;
+
+            if (!isVerified && !sessionStorage.getItem("notified_unverified_student")) {
+              sessionStorage.setItem("notified_unverified_student", "true");
+              setTimeout(() => {
+                toast({
+                  title: "⚠️ Student Verification Pending",
+                  description: "Your university affiliation is unverified. Verify your student ID or institutional email to access research studies and cash earnings.",
+                });
+              }, 800);
+            }
+
             const destination = role === "participant" ? "/surveys" : "/dashboard";
             navigate(destination, { replace: true });
           } catch {
@@ -77,6 +89,29 @@ export const AuthHandler = () => {
 
       return () => subscription.unsubscribe();
     }
+
+    // 4. Proactive check for any logged-in unverified user on dashboard or surveys
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user && !sessionStorage.getItem("notified_unverified_student")) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("is_verified, role")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+
+          if (profile && !profile.is_verified) {
+            sessionStorage.setItem("notified_unverified_student", "true");
+            setTimeout(() => {
+              toast({
+                title: "⚠️ Student Verification Pending",
+                description: "Your Nigerian university student status is unverified. Verify now to unlock student research studies and cash withdrawals.",
+              });
+            }, 1200);
+          }
+        } catch {}
+      }
+    });
   }, [location.pathname, navigate, toast]);
 
   return null;

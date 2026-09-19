@@ -34,6 +34,7 @@ import {
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
 import { AiInsightsModal } from "@/components/AiInsightsModal";
 import { ExtendQuotaModal } from "@/components/ExtendQuotaModal";
+import { UnverifiedStudentBanner } from "@/components/UnverifiedStudentBanner";
 
 // Mock data for demonstration
 const mockSurveys = [
@@ -325,6 +326,8 @@ const Dashboard = () => {
         </header>
 
         <div className="p-6">
+          <UnverifiedStudentBanner className="mb-5" />
+
           {/* Researcher Studio Banner */}
           <div className="mb-6 rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white p-5 sm:p-6 shadow-md border border-indigo-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5">
