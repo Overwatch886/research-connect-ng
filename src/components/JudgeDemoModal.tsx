@@ -55,25 +55,42 @@ export const JudgeDemoModal = () => {
 
   return (
     <>
-      {/* Floating Pill Button for Instant Access Anytime (hidden on /demo) */}
+      {/* Floating Demo Trigger Button (hidden on /demo) */}
       {location.pathname !== "/demo" && (
-        <div className="fixed bottom-5 right-5 z-40 animate-fade-in">
-          <Button
-            onClick={() => setIsOpen(true)}
-            variant="default"
-            className="shadow-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-700 hover:to-amber-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-full flex items-center gap-2 border border-white/20 transition-all hover:scale-105 active:scale-95"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-            </span>
-            <Video className="w-4 h-4 text-white" />
-            <span>Watch Demo Video</span>
-            <Badge className="bg-white/20 text-white text-[10px] px-1.5 py-0 rounded-full font-mono">
-              MLH Judge
-            </Badge>
-          </Button>
-        </div>
+        <>
+          {/* Mobile Compact Circular FAB (<sm) */}
+          <div className="fixed bottom-4 right-4 z-40 sm:hidden animate-fade-in">
+            <Button
+              onClick={() => setIsOpen(true)}
+              variant="default"
+              size="icon"
+              className="h-12 w-12 rounded-full shadow-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-700 hover:to-amber-700 text-white border border-white/30 flex items-center justify-center relative active:scale-95 transition-transform"
+              title="Watch Demo Video"
+            >
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-40"></span>
+              <Play className="w-5 h-5 fill-white text-white ml-0.5 relative z-10" />
+            </Button>
+          </div>
+
+          {/* Desktop/Tablet Pill (>=sm) */}
+          <div className="fixed bottom-5 right-5 z-40 hidden sm:block animate-fade-in max-w-[calc(100vw-2.5rem)]">
+            <Button
+              onClick={() => setIsOpen(true)}
+              variant="default"
+              className="shadow-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-700 hover:to-amber-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-full flex items-center gap-2 border border-white/20 transition-all hover:scale-105 active:scale-95"
+            >
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <Video className="w-4 h-4 text-white shrink-0" />
+              <span className="whitespace-nowrap">Watch Demo Video</span>
+              <Badge className="bg-white/20 text-white text-[10px] px-1.5 py-0 rounded-full font-mono shrink-0">
+                MLH Judge
+              </Badge>
+            </Button>
+          </div>
+        </>
       )}
 
       {/* Main Foreground Spotlight Dialog */}
