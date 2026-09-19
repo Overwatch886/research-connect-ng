@@ -2,9 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const DEFAULT_SUPABASE_URL = "https://bvwygsfylmovlolllhrp.supabase.co";
-const DEFAULT_SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2d3lnc2Z5bG1vdmxvbGxsaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MjA4ODQsImV4cCI6MjA4MzQ5Njg4NH0.OnuP4HgmepKHL0htgJPNc5_1NzuPguOk4BQA9cs_QQs";
+const DEFAULT_SUPABASE_URL = "https://acbulhegpywtzxrftfvc.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_wgyyltjPat-o4n-RORJCqA_L3Le_Z8L";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
