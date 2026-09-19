@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ const Signup = () => {
   });
 
   // Listen for OAuth callback errors in URL
-  useState(() => {
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, "?"));
@@ -41,7 +41,7 @@ const Signup = () => {
         }, 300);
       }
     }
-  });
+  }, []);
 
   const handleGoogleSignUp = async () => {
     setIsGoogleLoading(true);
