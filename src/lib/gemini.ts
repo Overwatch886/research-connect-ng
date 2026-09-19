@@ -86,12 +86,24 @@ export const extractJson = <T>(text: string): T => {
 // ---------------------------------------------------------------------------
 
 export const GEMINI_MODEL_CANDIDATES = [
-  "gemini-1.5-flash",
   "gemini-2.5-flash",
-  "gemini-1.5-pro",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
   "gemini-flash-latest",
+  "gemini-1.5-pro",
   "gemini-2.0-flash-exp",
 ];
+
+let clientRoundRobinIndex = 0;
+
+export function getNextRoundRobinModel(): string {
+  const model = GEMINI_MODEL_CANDIDATES[clientRoundRobinIndex % GEMINI_MODEL_CANDIDATES.length];
+  clientRoundRobinIndex = (clientRoundRobinIndex + 1) % GEMINI_MODEL_CANDIDATES.length;
+  return model;
+}
 
 const DEFAULT_GEMINI_MODEL = GEMINI_MODEL_CANDIDATES[0];
 const GEMINI_EDGE_FUNCTION = "gemini";
@@ -115,31 +127,53 @@ const isUnknownModelError = (msg: string): boolean =>
 
 async function callGeminiDirect(apiKey: string, prompt: string, model: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const candidates = [model, ...GEMINI_MODEL_CANDIDATES.filter((m) => m !== model)];
+  const offset = clientRoundRobinIndex % GEMINI_MODEL_CANDIDATES.length;
+  const rotatedCandidates = [
+    ...GEMINI_MODEL_CANDIDATES.slice(offset),
+    ...GEMINI_MODEL_CANDIDATES.slice(0, offset),
+  ];
+  const candidates = model
+    ? [model, ...rotatedCandidates.filter((m) => m !== model)]
+    : rotatedCandidates;
+
   let lastErr: unknown;
+  let quotaHitCount = 0;
 
   for (const candidate of candidates) {
     try {
       const result = await genAI.getGenerativeModel({ model: candidate }).generateContent(prompt);
       const text = result.response.text().trim();
-      if (text) return text;
+      if (text) {
+        // Successful generation: advance round-robin so next call uses a fresh model
+        clientRoundRobinIndex = (clientRoundRobinIndex + 1) % GEMINI_MODEL_CANDIDATES.length;
+        return text;
+      }
       lastErr = new Error("Gemini returned an empty response.");
     } catch (err: any) {
       lastErr = err;
       const msg = String(err?.message || err);
       if (isQuotaError(err, msg)) {
-        handleGeminiError(err);
-        throw new GeminiError("quota", "Your Gemini API key has hit its Google AI Studio rate limit.");
+        quotaHitCount++;
+        console.warn(`[Gemini Rotator] Model ${candidate} reached quota limit. Rotating to next model (${quotaHitCount}/${candidates.length} tried)...`);
+        clientRoundRobinIndex = (clientRoundRobinIndex + 1) % GEMINI_MODEL_CANDIDATES.length;
+        continue; // Keep rotating to other available models!
       }
       if (isUnknownModelError(msg)) {
         console.warn(`Model ${candidate} unavailable (${msg}). Trying next fallback candidate...`);
         continue;
       }
-      throw err;
+      // For any other transient error, try next candidate
+      continue;
     }
   }
 
-  throw lastErr instanceof Error ? lastErr : new Error("Gemini generation failed.");
+  // Only if ALL models in the quota pool were exhausted:
+  if (quotaHitCount > 0) {
+    handleGeminiError(lastErr);
+    throw new GeminiError("quota", "All available Gemini models have temporarily reached their Google AI Studio rate limits.");
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error("Gemini generation failed across all available models.");
 }
 
 async function callGeminiProxy(prompt: string, model: string): Promise<string> {
@@ -227,10 +261,11 @@ async function callGeminiProxy(prompt: string, model: string): Promise<string> {
   return text;
 }
 
-async function callGeminiText(prompt: string, model: string = DEFAULT_GEMINI_MODEL): Promise<string> {
+async function callGeminiText(prompt: string, model?: string): Promise<string> {
+  const chosenModel = model || getNextRoundRobinModel();
   const apiKey = getGeminiApiKey();
-  if (apiKey) return callGeminiDirect(apiKey, prompt, model);
-  return callGeminiProxy(prompt, model);
+  if (apiKey) return callGeminiDirect(apiKey, prompt, chosenModel);
+  return callGeminiProxy(prompt, chosenModel);
 }
 
 // Interface definitions
