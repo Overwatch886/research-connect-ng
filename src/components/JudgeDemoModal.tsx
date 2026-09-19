@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Sparkles, ExternalLink, Video, CheckCircle2, X } from "lucide-react";
+import { Play, Sparkles, ExternalLink, Video, CheckCircle2, ArrowRight } from "lucide-react";
 
 export const YOUTUBE_VIDEO_ID = "n1C3cstX7xY";
 export const YOUTUBE_EMBED_URL = `https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=0&rel=0`;
@@ -15,8 +16,14 @@ export const openDemoVideoModal = () => {
 export const JudgeDemoModal = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [hasDismissed, setHasDismissed] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
+    // If the user is directly viewing the dedicated /demo page, don't auto-popup over it
+    if (location.pathname === "/demo") {
+      return;
+    }
+
     // Check if previously dismissed in this session
     const dismissed = sessionStorage.getItem("rc_judge_demo_dismissed") === "true";
     if (dismissed) {
@@ -24,11 +31,13 @@ export const JudgeDemoModal = () => {
     } else {
       // Auto-popup after 2 seconds for fresh visitors / judges
       const timer = setTimeout(() => {
-        setIsOpen(true);
+        if (window.location.pathname !== "/demo") {
+          setIsOpen(true);
+        }
       }, 1800);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -46,24 +55,26 @@ export const JudgeDemoModal = () => {
 
   return (
     <>
-      {/* Floating Pill Button for Instant Access Anytime */}
-      <div className="fixed bottom-5 right-5 z-40 animate-fade-in">
-        <Button
-          onClick={() => setIsOpen(true)}
-          variant="default"
-          className="shadow-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-700 hover:to-amber-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-full flex items-center gap-2 border border-white/20 transition-all hover:scale-105 active:scale-95"
-        >
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-          </span>
-          <Video className="w-4 h-4 text-white" />
-          <span>Watch Demo Video</span>
-          <Badge className="bg-white/20 text-white text-[10px] px-1.5 py-0 rounded-full font-mono">
-            MLH Judge
-          </Badge>
-        </Button>
-      </div>
+      {/* Floating Pill Button for Instant Access Anytime (hidden on /demo) */}
+      {location.pathname !== "/demo" && (
+        <div className="fixed bottom-5 right-5 z-40 animate-fade-in">
+          <Button
+            onClick={() => setIsOpen(true)}
+            variant="default"
+            className="shadow-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-600 hover:from-indigo-700 hover:to-amber-700 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-full flex items-center gap-2 border border-white/20 transition-all hover:scale-105 active:scale-95"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <Video className="w-4 h-4 text-white" />
+            <span>Watch Demo Video</span>
+            <Badge className="bg-white/20 text-white text-[10px] px-1.5 py-0 rounded-full font-mono">
+              MLH Judge
+            </Badge>
+          </Button>
+        </div>
+      )}
 
       {/* Main Foreground Spotlight Dialog */}
       <Dialog open={isOpen} onOpenChange={(open) => {
@@ -123,14 +134,23 @@ export const JudgeDemoModal = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+              <Link
+                to="/demo"
+                onClick={handleClose}
+                className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 px-3 py-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 transition-colors font-medium"
+              >
+                <span>Full Demo Page</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+
               <a
                 href={YOUTUBE_WATCH_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg border border-border transition-colors"
               >
-                <span>Open in YouTube</span>
+                <span>YouTube</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
 
