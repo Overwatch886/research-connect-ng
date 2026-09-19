@@ -90,7 +90,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Build verification URL
-    const origin = req.headers.get("origin") || "https://bvwygsfylmovlolllhrp.lovableproject.com";
+    const origin = req.headers.get("origin") || "https://research-connect-ng.vercel.app";
     const verificationUrl = `${origin}/verify-email?token=${verificationToken}`;
     
     console.log(`Sending verification email to ${email}`);
