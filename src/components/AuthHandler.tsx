@@ -67,9 +67,11 @@ export const AuthHandler = () => {
               .maybeSingle();
 
             const role = profile?.role || session.user.user_metadata?.role || "researcher";
-            const isVerified = profile?.is_verified ?? false;
+            const isLocalVerified = typeof window !== "undefined" && localStorage.getItem("research_connect_student_verified") === "true";
+            const isVerified = Boolean(profile?.is_verified || isLocalVerified);
 
-            if (!isVerified && !sessionStorage.getItem("notified_unverified_student")) {
+            // Only notify unverified student participants, never researchers or verified accounts
+            if (!isVerified && role === "participant" && !sessionStorage.getItem("notified_unverified_student")) {
               sessionStorage.setItem("notified_unverified_student", "true");
               setTimeout(() => {
                 toast({
@@ -100,7 +102,12 @@ export const AuthHandler = () => {
             .eq("user_id", session.user.id)
             .maybeSingle();
 
-          if (profile && !profile.is_verified) {
+          const isLocalVerified = typeof window !== "undefined" && localStorage.getItem("research_connect_student_verified") === "true";
+          const isVerified = Boolean(profile?.is_verified || isLocalVerified);
+          const isStudent = (profile?.role || session.user.user_metadata?.role) === "participant";
+
+          // Only notify if definitely an unverified student participant
+          if (!isVerified && isStudent) {
             sessionStorage.setItem("notified_unverified_student", "true");
             setTimeout(() => {
               toast({

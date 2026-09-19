@@ -8,9 +8,10 @@ interface UnverifiedStudentBannerProps {
 }
 
 export const UnverifiedStudentBanner = ({ className = "" }: UnverifiedStudentBannerProps) => {
-  const { profile, isLoading } = useProfile();
+  const isLocalVerified = typeof window !== "undefined" && localStorage.getItem("research_connect_student_verified") === "true";
+  const isVerified = Boolean(profile?.is_verified || isLocalVerified);
 
-  if (isLoading || !profile || profile.is_verified) {
+  if (isLoading || !profile || isVerified || profile.role === "researcher") {
     return null;
   }
 
