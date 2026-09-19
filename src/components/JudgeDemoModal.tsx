@@ -81,87 +81,88 @@ export const JudgeDemoModal = () => {
         if (!open) handleClose();
         else setIsOpen(true);
       }}>
-        <DialogContent className="max-w-4xl w-[94vw] p-0 overflow-hidden border border-border/80 bg-background/95 backdrop-blur-2xl shadow-2xl rounded-2xl md:rounded-3xl">
-          {/* Header Bar */}
-          <div className="p-5 md:p-6 bg-gradient-to-b from-muted/80 to-transparent border-b border-border/50">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-indigo-500/40 text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 text-xs px-2.5 py-0.5 font-semibold gap-1">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  MLH Build-a-thon Submission
+        <DialogContent className="w-[96vw] max-w-4xl max-h-[92dvh] sm:max-h-[88vh] p-0 flex flex-col gap-0 overflow-hidden border border-border/80 bg-background/95 backdrop-blur-2xl shadow-2xl rounded-2xl md:rounded-3xl">
+          {/* Scrollable Container for small screens */}
+          <div className="flex flex-col flex-1 overflow-y-auto overscroll-contain">
+            {/* Header Bar */}
+            <div className="p-3.5 sm:p-5 pr-10 sm:pr-12 bg-gradient-to-b from-muted/80 to-transparent border-b border-border/50 shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1.5">
+                <Badge variant="outline" className="border-indigo-500/40 text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 text-[11px] sm:text-xs px-2 py-0.5 font-semibold gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  MLH Submission
                 </Badge>
-                <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[11px] px-2 py-0.5">
-                  Best Use of Google Gemini API
+                <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] sm:text-[11px] px-2 py-0.5">
+                  Best Use of Gemini API
                 </Badge>
               </div>
+
+              <DialogTitle className="text-base sm:text-xl md:text-2xl font-bold tracking-tight text-foreground leading-snug">
+                Research Connect NG — Demo Walkthrough
+              </DialogTitle>
+              <DialogDescription className="text-[11px] sm:text-xs md:text-sm text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-none">
+                Watch our recorded walkthrough demonstrating verified Nigerian student surveys, Gemini-powered research paper synthesis, and NotebookLM audio overviews.
+              </DialogDescription>
             </div>
 
-            <DialogTitle className="text-xl md:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <span>Research Connect NG — Official Demo Walkthrough</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs md:text-sm text-muted-foreground mt-1">
-              Welcome Judges & Visitors! Watch our recorded walkthrough demonstrating verified Nigerian student surveys, Gemini-powered research paper synthesis, and NotebookLM audio overviews.
-            </DialogDescription>
-          </div>
-
-          {/* YouTube Video Container */}
-          <div className="relative aspect-video w-full bg-black">
-            {isOpen && (
-              <iframe
-                src={YOUTUBE_EMBED_URL}
-                title="Research Connect NG Demo Video"
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            )}
-          </div>
-
-          {/* Footer Highlights & Navigation */}
-          <div className="p-4 md:p-6 bg-card border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Verified Student Verification</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Google Gemini API Synthesis</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
-                <span>NotebookLM Dossier & Audio Briefing</span>
-              </div>
+            {/* YouTube Video Responsive Container */}
+            <div className="relative w-full aspect-video bg-black shrink-0">
+              {isOpen && (
+                <iframe
+                  src={YOUTUBE_EMBED_URL}
+                  title="Research Connect NG Demo Video"
+                  className="absolute inset-0 w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-              <Link
-                to="/demo"
-                onClick={handleClose}
-                className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 px-3 py-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 transition-colors font-medium"
-              >
-                <span>Full Demo Page</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+            {/* Footer Highlights & Navigation */}
+            <div className="p-3 sm:p-4 bg-card border-t border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+              <div className="hidden md:flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Student Verification</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Gemini API Synthesis</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
+                  <span>NotebookLM Audio</span>
+                </div>
+              </div>
 
-              <a
-                href={YOUTUBE_WATCH_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg border border-border transition-colors"
-              >
-                <span>YouTube</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                <Link
+                  to="/demo"
+                  onClick={handleClose}
+                  className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 px-2.5 sm:px-3 py-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/5 transition-colors font-medium flex-1 sm:flex-initial text-center"
+                >
+                  <span>Full Demo Page</span>
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
 
-              <Button
-                onClick={handleClose}
-                variant="default"
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 text-xs"
-              >
-                Explore Live Platform
-              </Button>
+                <a
+                  href={YOUTUBE_WATCH_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1 text-[11px] sm:text-xs text-muted-foreground hover:text-foreground px-2.5 sm:px-3 py-1.5 rounded-lg border border-border transition-colors flex-1 sm:flex-initial text-center"
+                >
+                  <span>YouTube</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+
+                <Button
+                  onClick={handleClose}
+                  variant="default"
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 sm:px-4 py-1.5 text-[11px] sm:text-xs flex-1 sm:flex-initial"
+                >
+                  Explore Platform
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

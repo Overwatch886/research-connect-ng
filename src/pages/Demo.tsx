@@ -105,17 +105,17 @@ const Demo = () => {
 
             {/* Video Tab */}
             {activeTab === "video" && (
-              <div className="aspect-video bg-neutral-950 flex flex-col items-center justify-center p-8 text-center text-white relative">
+              <div className="relative w-full aspect-video bg-neutral-950 overflow-hidden">
                 {videoUrl ? (
                   <iframe
                     src={videoUrl.includes("watch?v=") ? videoUrl.replace("watch?v=", "embed/") : videoUrl}
                     title="Platform Demo Video"
-                    className="w-full h-full border-0"
+                    className="absolute inset-0 w-full h-full border-0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 ) : (
-                  <div className="max-w-md space-y-4">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-white h-full max-w-md mx-auto space-y-4">
                     <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto text-primary backdrop-blur-md border border-white/20">
                       <Play className="w-8 h-8 ml-1 text-white" />
                     </div>
