@@ -25,6 +25,24 @@ const Signup = () => {
     password: "",
   });
 
+  // Listen for OAuth callback errors in URL
+  useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, "?"));
+      const errorMsg = params.get("error_description") || hashParams.get("error_description") || params.get("error");
+      if (errorMsg) {
+        setTimeout(() => {
+          toast({
+            title: "Authentication Issue",
+            description: decodeURIComponent(errorMsg),
+            variant: "destructive",
+          });
+        }, 300);
+      }
+    }
+  });
+
   const handleGoogleSignUp = async () => {
     setIsGoogleLoading(true);
     try {
@@ -126,7 +144,7 @@ const Signup = () => {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.origin}/verify-email`,
           data: {
             full_name: trimmedName,
             role: role,
@@ -134,13 +152,26 @@ const Signup = () => {
         },
       });
 
+      if (error) throw error;
+
       if (data.user) {
+        // Supabase returns an empty identities array when the email is already registered
+        if (data.user.identities && data.user.identities.length === 0) {
+          toast({
+            title: "Account Already Exists",
+            description: "An account with this email is already registered. Please sign in or reset your password.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
         // If email confirmation is required by Supabase, session is null
         if (!data.session) {
           setVerificationSent(true);
           toast({
             title: "Verification Email Sent!",
-            description: `Please check ${formData.email} to confirm your account before signing in.`,
+            description: `Please check ${formData.email} (including your spam folder) to confirm your account.`,
           });
           return;
         }
@@ -237,10 +268,7 @@ const Signup = () => {
                   <span>Important Delivery Note</span>
                 </p>
                 <p className="text-muted-foreground">
-                  Free tier emails may take 1–2 minutes or land in your <strong>Spam / Junk</strong> folder.
-                </p>
-                <p className="text-muted-foreground pt-0.5 border-t border-amber-200 dark:border-amber-800/60">
-                  ⚡ <strong>For instant signup</strong>: You can disable <em>"Confirm email"</em> in Supabase Dashboard (<em>Authentication → Providers → Email</em>) so users sign in instantly without waiting for verification emails.
+                  Verification emails may take 1–2 minutes to arrive. Please check your <strong>Spam or Junk folder</strong> if you do not see it in your primary inbox.
                 </p>
               </div>
 

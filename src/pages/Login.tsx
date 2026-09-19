@@ -16,6 +16,24 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Listen for OAuth callback errors in URL
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, "?"));
+      const errorMsg = params.get("error_description") || hashParams.get("error_description") || params.get("error");
+      if (errorMsg) {
+        setTimeout(() => {
+          toast({
+            title: "Google Sign-In Issue",
+            description: decodeURIComponent(errorMsg),
+            variant: "destructive",
+          });
+        }, 300);
+      }
+    }
+  }, []);
+
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
