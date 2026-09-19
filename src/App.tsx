@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthHandler } from "@/components/AuthHandler";
+import { JudgeDemoModal } from "@/components/JudgeDemoModal";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -33,6 +34,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <AuthHandler />
+            <JudgeDemoModal />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />

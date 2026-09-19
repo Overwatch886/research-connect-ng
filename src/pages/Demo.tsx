@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 
 const Demo = () => {
-  const [activeTab, setActiveTab] = useState<"interactive" | "video">("interactive");
-  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"interactive" | "video">("video");
+  const [videoUrl, setVideoUrl] = useState<string>("https://www.youtube.com/watch?v=n1C3cstX7xY");
   const [activeStep, setActiveStep] = useState(1);
 
   return (
@@ -39,34 +39,31 @@ const Demo = () => {
             See how Nigerian researchers create AI-calibrated surveys, how verified students earn cash through conversational interviews, and how findings transform into publication-ready research papers.
           </p>
 
-          {/* Recording Reminder Alert */}
-          <div className="mt-8 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 text-left max-w-3xl mx-auto flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+          {/* Official Hackathon Submission Banner */}
+          <div className="mt-8 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-amber-500/10 border border-indigo-500/30 rounded-2xl p-5 text-left max-w-3xl mx-auto flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
               <Video className="w-5 h-5" />
             </div>
             <div className="space-y-1.5 flex-1">
-              <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
-                <span>📹 Live Video Demo Recording Reminder</span>
-                <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0">To-Do</Badge>
-              </h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Remember to record a 2 to 3-minute screen recording of the site in use showcasing:
-                (1) Survey generation with Gemini AI, (2) Conversational interview with voice dictation, and (3) Academic paper drafting with 1-click Google NotebookLM export.
-              </p>
-              <div className="pt-1 flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Paste YouTube or Loom Embed URL here..."
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-background border border-border w-full sm:w-80 outline-none focus:ring-1 focus:ring-amber-500"
-                />
-                {videoUrl && (
-                  <Badge variant="outline" className="text-[11px] text-emerald-600 border-emerald-500/40">
-                    Video Linked!
-                  </Badge>
-                )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
+                  <span>🏆 Official Hackathon Demo Walkthrough</span>
+                  <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0">Live</Badge>
+                </h4>
+                <a
+                  href="https://www.youtube.com/watch?v=n1C3cstX7xY"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                >
+                  <span>Watch on YouTube</span>
+                  <ArrowRight className="w-3 h-3" />
+                </a>
               </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Submitted to <strong>MLH Build-a-thon Ibadan</strong> for <strong>Best Use of the Google Gemini API</strong>.
+                Showcasing live student verification, Google Gemini AI research paper drafting, dynamic quota failover, and Google NotebookLM audio overviews.
+              </p>
             </div>
           </div>
         </section>

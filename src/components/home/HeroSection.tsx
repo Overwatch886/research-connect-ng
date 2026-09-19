@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Shield, Users, Zap, CheckCircle } from "lucide-react";
+import { ArrowRight, Shield, Users, Zap, CheckCircle, Play } from "lucide-react";
+import { openDemoVideoModal } from "@/components/JudgeDemoModal";
 
 const HeroSection = () => {
   return (
@@ -43,6 +44,15 @@ const HeroSection = () => {
               <Link to="/signup?role=participant">
                 Earn as Participant
               </Link>
+            </Button>
+            <Button
+              variant="heroOutline"
+              size="xl"
+              onClick={openDemoVideoModal}
+              className="gap-2 border-amber-400/50 text-amber-300 hover:bg-amber-400/10 hover:border-amber-300"
+            >
+              <Play className="w-4 h-4 fill-amber-400 text-amber-400" />
+              Watch Demo Video
             </Button>
           </div>
 

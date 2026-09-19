@@ -23,9 +23,11 @@ import {
   ArrowRightLeft,
   ShieldCheck,
   PlusCircle,
-  BarChart3
+  BarChart3,
+  Play
 } from "lucide-react";
 import { GeminiKeyModal } from "@/components/GeminiKeyModal";
+import { openDemoVideoModal } from "@/components/JudgeDemoModal";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
@@ -152,6 +154,16 @@ const Navbar = () => {
 
           {/* Right Actions */}
           <div className="hidden md:flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openDemoVideoModal}
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 rounded-lg h-8"
+            >
+              <Play className="w-3 h-3 fill-current" />
+              <span>Demo Video</span>
+            </Button>
+
             <GeminiKeyModal variant="badge" />
 
             {user ? (
